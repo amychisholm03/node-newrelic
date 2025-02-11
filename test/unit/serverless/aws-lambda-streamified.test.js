@@ -1354,6 +1354,7 @@ test('AwsLambda.patchLambdaHandler', async (t) => {
         responseStream = lambdaBuiltIns.HttpsResponseStream.from(responseStream, validStreamMetaData)
         const chunks = ['step 1', 'step 2', 'step 3']
         const stream = writeStreamResponse(chunks, responseStream, 500)
+        stream.end()
         context.succeed('worked')
       })
 
@@ -1380,10 +1381,12 @@ test('AwsLambda.patchLambdaHandler', async (t) => {
         end()
       }
 
-      const wrappedHandler = awsLambda.patchLambdaHandler((event, context) => {
+      const handler = lambdaBuiltIns.streamifyResponse(async (event, responseStream, context) => {
         transaction = agent.tracer.getTransaction()
         context.fail()
       })
+
+      const wrappedHandler = awsLambda.patchLambdaHandler(handler)
 
       wrappedHandler(stubEvent, stubResponseStream, stubContext)
     })
@@ -1670,7 +1673,7 @@ test('AwsLambda.patchLambdaHandler', async (t) => {
     await plan.completed
   })
 
-  await t.test('should not end transactions twice', (t, end) => {
+  await t.test('should not end transactions twice', async (t) => {
     const { agent, awsLambda, stubEvent, stubResponseStream, stubContext } = t.nr
     let transaction
 
@@ -1685,29 +1688,26 @@ test('AwsLambda.patchLambdaHandler', async (t) => {
         called = true
         return oldEnd.apply(transaction, arguments)
       }
+
+      assert.ok(transaction)
+      assert.equal(transaction.type, 'bg')
+      assert.equal(transaction.getFullName(), expectedBgTransactionName)
+      assert.ok(transaction.isActive())
+
       return new Promise((resolve) => {
-        assert.ok(transaction)
-        assert.equal(transaction.type, 'bg')
-        assert.equal(transaction.getFullName(), expectedBgTransactionName)
         assert.ok(transaction.isActive())
 
-        assert.equal(transaction.isActive(), false)
-        return resolve('hello')
+        setTimeout(() => {
+          assert.equal(transaction.isActive(), false)
+          resolve('hello')
+        }, 0)
       })
     })
 
     const wrappedHandler = awsLambda.patchLambdaHandler(handler)
-
-    wrappedHandler(stubEvent, stubResponseStream, stubContext)
-      .then((value) => {
-        assert.equal(value, 'hello')
-        assert.equal(transaction.isActive(), false)
-
-        end()
-      })
-      .catch((err) => {
-        end(err)
-      })
+    const value = await wrappedHandler(stubEvent, stubResponseStream, stubContext)
+    assert.equal(value, 'hello')
+    assert.equal(transaction.isActive(), false)
   })
 
   await t.test('should record standard background metrics', (t, end) => {
