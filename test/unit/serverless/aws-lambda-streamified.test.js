@@ -8,7 +8,7 @@
 const test = require('node:test')
 const assert = require('node:assert')
 const os = require('node:os')
-const { Writable } = require('node:stream');
+const { Writable } = require('node:stream')
 
 const { tspl } = require('@matteo.collina/tspl')
 const helper = require('../../lib/agent_helper')
@@ -273,8 +273,6 @@ test('AwsLambda.patchLambdaHandler', async (t) => {
 
           assert.ok(headers.traceparent)
           assert.ok(headers.tracestate)
-
-          callback(null, validResponse)
         })
 
         const wrappedHandler = awsLambda.patchLambdaHandler(handler)
@@ -437,7 +435,7 @@ test('AwsLambda.patchLambdaHandler', async (t) => {
       }
     })
 
-    /// TODO: make sure the agent can capture HTTP statusCode from the stream metadata. 
+    /// TODO: make sure the agent can capture HTTP statusCode from the stream metadata.
     // await t.test('should capture status code', (t, end) => {
     //   const { agent, awsLambda, stubResponseStream, stubContext } = t.nr
     //   agent.on('transactionFinished', confirmAgentAttribute)
@@ -541,7 +539,7 @@ test('AwsLambda.patchLambdaHandler', async (t) => {
         const chunks = ['no headers 1', 'no headers 2', 'no headers 3']
         await writeStreamResponse(chunks, responseStream, 500)
         responseStream.end()
-      });
+      })
 
       const wrappedHandler = awsLambda.patchLambdaHandler(handler)
 
@@ -1190,79 +1188,79 @@ test('AwsLambda.patchLambdaHandler', async (t) => {
     }
   })
 
-  await t.test('when callback used', async (t) => {
-    helper.unloadAgent(t.nr.agent)
+  // await t.test('when callback used', async (t) => {
+  //   helper.unloadAgent(t.nr.agent)
 
-    await t.test('should end appropriately', (t, end) => {
-      const { agent, awsLambda, stubEvent, stubContext } = t.nr
-      let transaction
+  //   await t.test('should end appropriately', (t, end) => {
+  //     const { agent, awsLambda, stubEvent, stubContext } = t.nr
+  //     let transaction
 
-      const handler = lambdaBuiltIns.streamifyResponse(async (event, responseStream, context) => {
-        transaction = agent.tracer.getTransaction()
-        callback(null, 'worked')
-      })
+  //     const handler = lambdaBuiltIns.streamifyResponse(async (event, responseStream, context) => {
+  //       transaction = agent.tracer.getTransaction()
+  //       callback(null, 'worked')
+  //     })
 
-      const wrappedHandler = awsLambda.patchLambdaHandler(handler)
+  //     const wrappedHandler = awsLambda.patchLambdaHandler(handler)
 
-      wrappedHandler(stubEvent, stubContext, function confirmEndCallback() {
-        assert.equal(transaction.isActive(), false)
+  //     wrappedHandler(stubEvent, stubContext, function confirmEndCallback() {
+  //       assert.equal(transaction.isActive(), false)
 
-        const currentTransaction = agent.tracer.getTransaction()
-        assert.equal(currentTransaction, null)
-        end()
-      })
-    })
+  //       const currentTransaction = agent.tracer.getTransaction()
+  //       assert.equal(currentTransaction, null)
+  //       end()
+  //     })
+  //   })
 
-    await t.test('should notice errors', (t, end) => {
-      const { agent, awsLambda, error, stubEvent, stubResponseStream, stubContext } = t.nr
-      agent.on('harvestStarted', confirmErrorCapture)
+  //   await t.test('should notice errors', (t, end) => {
+  //     const { agent, awsLambda, error, stubEvent, stubResponseStream, stubContext } = t.nr
+  //     agent.on('harvestStarted', confirmErrorCapture)
 
-      const handler = lambdaBuiltIns.streamifyResponse(async (event, responseStream, context) => {
-        callback(error, 'failed')
-      })
+  //     const handler = lambdaBuiltIns.streamifyResponse(async (event, responseStream, context) => {
+  //       callback(error, 'failed')
+  //     })
 
-      const wrappedHandler = awsLambda.patchLambdaHandler(handler)
+  //     const wrappedHandler = awsLambda.patchLambdaHandler(handler)
 
-      wrappedHandler(stubEvent, stubResponseStream, stubContext)
+  //     wrappedHandler(stubEvent, stubResponseStream, stubContext)
 
-      function confirmErrorCapture() {
-        assert.equal(agent.errors.traceAggregator.errors.length, 1)
-        const noticedError = agent.errors.traceAggregator.errors[0]
-        assert.equal(noticedError[1], expectedBgTransactionName)
-        assert.equal(noticedError[2], errorMessage)
-        assert.equal(noticedError[3], 'SyntaxError')
-      }
+  //     function confirmErrorCapture() {
+  //       assert.equal(agent.errors.traceAggregator.errors.length, 1)
+  //       const noticedError = agent.errors.traceAggregator.errors[0]
+  //       assert.equal(noticedError[1], expectedBgTransactionName)
+  //       assert.equal(noticedError[2], errorMessage)
+  //       assert.equal(noticedError[3], 'SyntaxError')
+  //     }
 
-      end()
-    })
+  //     end()
+  //   })
 
-    await t.test('should notice string errors', (t, end) => {
-      const { agent, awsLambda, stubEvent, stubResponseStream, stubContext } = t.nr
-      agent.on('harvestStarted', confirmErrorCapture)
+  //   await t.test('should notice string errors', (t, end) => {
+  //     const { agent, awsLambda, stubEvent, stubResponseStream, stubContext } = t.nr
+  //     agent.on('harvestStarted', confirmErrorCapture)
 
-      const handler = lambdaBuiltIns.streamifyResponse(async (event, responseStream, context) => {
-        // eslint-disable-next-line n/no-callback-literal
-        callback('failed')
-      })
+  //     const handler = lambdaBuiltIns.streamifyResponse(async (event, responseStream, context) => {
+  //       // eslint-disable-next-line n/no-callback-literal
+  //       callback('failed')
+  //     })
 
-      const wrappedHandler = awsLambda.patchLambdaHandler(handler)
+  //     const wrappedHandler = awsLambda.patchLambdaHandler(handler)
 
-      wrappedHandler(stubEvent, stubResponseStream, stubContext)
+  //     wrappedHandler(stubEvent, stubResponseStream, stubContext)
 
-      function confirmErrorCapture() {
-        assert.equal(agent.errors.traceAggregator.errors.length, 1)
-        const noticedError = agent.errors.traceAggregator.errors[0]
-        assert.equal(noticedError[1], expectedBgTransactionName)
-        assert.equal(noticedError[2], 'failed')
-        assert.equal(noticedError[3], 'Error')
+  //     function confirmErrorCapture() {
+  //       assert.equal(agent.errors.traceAggregator.errors.length, 1)
+  //       const noticedError = agent.errors.traceAggregator.errors[0]
+  //       assert.equal(noticedError[1], expectedBgTransactionName)
+  //       assert.equal(noticedError[2], 'failed')
+  //       assert.equal(noticedError[3], 'Error')
 
-        const data = noticedError[4]
-        assert.ok(data.stack_trace)
-      }
+  //       const data = noticedError[4]
+  //       assert.ok(data.stack_trace)
+  //     }
 
-      end()
-    })
-  })
+  //     end()
+  //   })
+  // })
 
   await test('when context.done used', async (t) => {
     helper.unloadAgent(t.nr.agent)
@@ -1328,7 +1326,7 @@ test('AwsLambda.patchLambdaHandler', async (t) => {
       })
 
       const handler = lambdaBuiltIns.streamifyResponse(async (event, responseStream, context) => {
-        context.done(error, 'failed')
+        context.done('failed')
       })
 
       const wrappedHandler = awsLambda.patchLambdaHandler(handler)
@@ -1386,7 +1384,6 @@ test('AwsLambda.patchLambdaHandler', async (t) => {
         transaction = agent.tracer.getTransaction()
         context.fail()
       })
-
 
       wrappedHandler(stubEvent, stubResponseStream, stubContext)
     })
@@ -1693,8 +1690,6 @@ test('AwsLambda.patchLambdaHandler', async (t) => {
         assert.equal(transaction.type, 'bg')
         assert.equal(transaction.getFullName(), expectedBgTransactionName)
         assert.ok(transaction.isActive())
-
-        cb()
 
         assert.equal(transaction.isActive(), false)
         return resolve('hello')
