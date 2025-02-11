@@ -1188,7 +1188,7 @@ test('AwsLambda.patchLambdaHandler', async (t) => {
     helper.unloadAgent(t.nr.agent)
 
     await t.test('should end appropriately', (t) => {
-      const { agent, awsLambda, stubEvent, stubContext } = t.nr
+      const { agent, awsLambda, stubEvent, stubResponseStream, stubContext } = t.nr
       let transaction
 
       const handler = lambdaBuiltIns.streamifyResponse(async (event, responseStream, context) => {
@@ -1196,18 +1196,17 @@ test('AwsLambda.patchLambdaHandler', async (t) => {
         responseStream = lambdaBuiltIns.HttpResponseStream.from(responseStream, validStreamMetaData)
         const chunks = ['chunk 1', 'chunk 2', 'chunk 3']
         const stream = await writeStreamResponse(chunks, responseStream, 500)
-        stream.end()
-        return 'worked'
+        return stream.end()
       })
 
       const wrappedHandler = awsLambda.patchLambdaHandler(handler)
 
-      wrappedHandler(stubEvent, stubContext, function confirmEndCallback() {
-        assert.equal(transaction.isActive(), false)
+      wrappedHandler(stubEvent, stubResponseStream, stubContext)
 
-        const currentTransaction = agent.tracer.getTransaction()
-        assert.equal(currentTransaction, null)
-      })
+      assert.equal(transaction.isActive(), false)
+
+      const currentTransaction = agent.tracer.getTransaction()
+      assert.equal(currentTransaction, null)
     })
 
     await t.test('should notice errors', (t) => {
