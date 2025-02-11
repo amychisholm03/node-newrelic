@@ -314,5 +314,8 @@ test('with default properties', async (t) => {
     assert.equal(configuration.instrumentation.express.enabled, true)
     assert.equal(configuration.instrumentation['@prisma/client'].enabled, true)
     assert.equal(configuration.instrumentation.npmlog.enabled, true)
+    assert.equal(configuration.instrumentation.http.enabled, true)
+    assert.equal(configuration.instrumentation.undici.enabled, true)
+    assert.equal(configuration.instrumentation.domain.enabled, true)
   })
 })

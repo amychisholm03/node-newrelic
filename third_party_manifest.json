@@ -1,5 +1,5 @@
 {
-  "lastUpdated": "Fri Jan 24 2025 16:28:36 GMT-0500 (Eastern Standard Time)",
+  "lastUpdated": "Mon Feb 10 2025 10:28:02 GMT-0500 (Eastern Standard Time)",
   "projectName": "New Relic Node Agent",
   "projectUrl": "https://github.com/newrelic/node-newrelic",
   "includeOptDeps": true,
@@ -44,15 +44,15 @@
   },
   "includeDev": true,
   "dependencies": {
-    "@grpc/grpc-js@1.12.5": {
+    "@grpc/grpc-js@1.12.4": {
       "name": "@grpc/grpc-js",
-      "version": "1.12.5",
+      "version": "1.12.4",
       "range": "^1.12.2",
       "licenses": "Apache-2.0",
       "repoUrl": "https://github.com/grpc/grpc-node/tree/master/packages/grpc-js",
-      "versionedRepoUrl": "https://github.com/grpc/grpc-node/tree/master/packages/grpc-js/tree/v1.12.5",
+      "versionedRepoUrl": "https://github.com/grpc/grpc-node/tree/master/packages/grpc-js/tree/v1.12.4",
       "licenseFile": "node_modules/@grpc/grpc-js/LICENSE",
-      "licenseUrl": "https://github.com/grpc/grpc-node/tree/master/packages/grpc-js/blob/v1.12.5/LICENSE",
+      "licenseUrl": "https://github.com/grpc/grpc-node/tree/master/packages/grpc-js/blob/v1.12.4/LICENSE",
       "licenseTextSource": "file",
       "publisher": "Google Inc."
     },
@@ -68,17 +68,19 @@
       "licenseTextSource": "file",
       "publisher": "Google Inc."
     },
-    "@newrelic/security-agent@2.2.0": {
+    "@newrelic/security-agent@2.3.1": {
       "name": "@newrelic/security-agent",
-      "version": "2.2.0",
-      "range": "^2.2.0",
+      "version": "2.3.1",
+      "range": "^2.3.0",
       "licenses": "UNKNOWN",
       "repoUrl": "https://github.com/newrelic/csec-node-agent",
-      "versionedRepoUrl": "https://github.com/newrelic/csec-node-agent/tree/v2.2.0",
-      "licenseFile": "node_modules/@newrelic/security-agent/LICENSE",
-      "licenseUrl": "https://github.com/newrelic/csec-node-agent/blob/v2.2.0/LICENSE",
+      "versionedRepoUrl": "https://github.com/newrelic/csec-node-agent/tree/v2.3.1",
+      "licenseFile": "node_modules\\@newrelic\\security-agent\\LICENSE",
       "licenseTextSource": "file",
-      "publisher": "newrelic"
+      "publisher": "newrelic",
+      "FOR_REVIEW": [
+        "Unable to determine license url."
+      ]
     },
     "@opentelemetry/api@1.9.0": {
       "name": "@opentelemetry/api",
@@ -128,18 +130,6 @@
       "licenseTextSource": "file",
       "publisher": "OpenTelemetry Authors"
     },
-    "@opentelemetry/semantic-conventions@1.28.0": {
-      "name": "@opentelemetry/semantic-conventions",
-      "version": "1.28.0",
-      "range": "^1.27.0",
-      "licenses": "Apache-2.0",
-      "repoUrl": "https://github.com/open-telemetry/opentelemetry-js",
-      "versionedRepoUrl": "https://github.com/open-telemetry/opentelemetry-js/tree/v1.28.0",
-      "licenseFile": "node_modules/@opentelemetry/semantic-conventions/LICENSE",
-      "licenseUrl": "https://github.com/open-telemetry/opentelemetry-js/blob/v1.28.0/LICENSE",
-      "licenseTextSource": "file",
-      "publisher": "OpenTelemetry Authors"
-    },
     "@tyriar/fibonacci-heap@2.0.9": {
       "name": "@tyriar/fibonacci-heap",
       "version": "2.0.9",
@@ -180,18 +170,20 @@
       "email": "nathan@tootallnate.net",
       "url": "http://n8.io/"
     },
-    "import-in-the-middle@1.12.0": {
+    "import-in-the-middle@1.13.0": {
       "name": "import-in-the-middle",
-      "version": "1.12.0",
-      "range": "^1.11.2",
+      "version": "1.13.0",
+      "range": "^1.13.0",
       "licenses": "Apache-2.0",
       "repoUrl": "https://github.com/nodejs/import-in-the-middle",
-      "versionedRepoUrl": "https://github.com/nodejs/import-in-the-middle/tree/v1.12.0",
-      "licenseFile": "node_modules/import-in-the-middle/LICENSE",
-      "licenseUrl": "https://github.com/nodejs/import-in-the-middle/blob/v1.12.0/LICENSE",
+      "versionedRepoUrl": "https://github.com/nodejs/import-in-the-middle/tree/v1.13.0",
+      "licenseFile": "node_modules\\import-in-the-middle\\LICENSE",
       "licenseTextSource": "file",
       "publisher": "Bryan English",
-      "email": "bryan.english@datadoghq.com"
+      "email": "bryan.english@datadoghq.com",
+      "FOR_REVIEW": [
+        "Unable to determine license url."
+      ]
     },
     "json-bigint@1.0.0": {
       "name": "json-bigint",
@@ -286,28 +278,28 @@
     }
   },
   "devDependencies": {
-    "@aws-sdk/client-s3@3.726.1": {
+    "@aws-sdk/client-s3@3.714.0": {
       "name": "@aws-sdk/client-s3",
-      "version": "3.726.1",
+      "version": "3.714.0",
       "range": "^3.556.0",
       "licenses": "Apache-2.0",
       "repoUrl": "https://github.com/aws/aws-sdk-js-v3",
-      "versionedRepoUrl": "https://github.com/aws/aws-sdk-js-v3/tree/v3.726.1",
+      "versionedRepoUrl": "https://github.com/aws/aws-sdk-js-v3/tree/v3.714.0",
       "licenseFile": "node_modules/@aws-sdk/client-s3/LICENSE",
-      "licenseUrl": "https://github.com/aws/aws-sdk-js-v3/blob/v3.726.1/LICENSE",
+      "licenseUrl": "https://github.com/aws/aws-sdk-js-v3/blob/v3.714.0/LICENSE",
       "licenseTextSource": "file",
       "publisher": "AWS SDK for JavaScript Team",
       "url": "https://aws.amazon.com/javascript/"
     },
-    "@aws-sdk/s3-request-presigner@3.726.1": {
+    "@aws-sdk/s3-request-presigner@3.714.0": {
       "name": "@aws-sdk/s3-request-presigner",
-      "version": "3.726.1",
+      "version": "3.714.0",
       "range": "^3.556.0",
       "licenses": "Apache-2.0",
       "repoUrl": "https://github.com/aws/aws-sdk-js-v3",
-      "versionedRepoUrl": "https://github.com/aws/aws-sdk-js-v3/tree/v3.726.1",
+      "versionedRepoUrl": "https://github.com/aws/aws-sdk-js-v3/tree/v3.714.0",
       "licenseFile": "node_modules/@aws-sdk/s3-request-presigner/LICENSE",
-      "licenseUrl": "https://github.com/aws/aws-sdk-js-v3/blob/v3.726.1/LICENSE",
+      "licenseUrl": "https://github.com/aws/aws-sdk-js-v3/blob/v3.714.0/LICENSE",
       "licenseTextSource": "file",
       "publisher": "AWS SDK for JavaScript Team",
       "url": "https://aws.amazon.com/javascript/"
