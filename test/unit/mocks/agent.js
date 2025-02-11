@@ -4,11 +4,9 @@
  */
 
 'use strict'
-
 const { EventEmitter } = require('events')
 const util = require('util')
 const sinon = require('sinon')
-const HealthReporter = require('#agentlib/health-reporter.js')
 
 module.exports = (sandbox = sinon, metricsMock) => {
   function MockAgent(config = {}) {
@@ -16,7 +14,6 @@ module.exports = (sandbox = sinon, metricsMock) => {
     this.config = config
     this.config.app_name = 'Unit Test App'
     this.metrics = metricsMock
-    this.healthReporter = new HealthReporter()
   }
   MockAgent.prototype.start = sandbox.stub()
   MockAgent.prototype.recordSupportability = sandbox.stub()

@@ -39,9 +39,9 @@ test('ignoring an Express route', async function (t) {
     let expectedMetrics = 3
     if (helper.isSecurityAgentEnabled(agent) === true) {
       if (isExpress5 === true) {
-        expectedMetrics = 14
+        expectedMetrics = 13
       } else {
-        expectedMetrics = 12
+        expectedMetrics = 11
       }
     }
     plan.equal(

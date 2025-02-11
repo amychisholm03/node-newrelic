@@ -5,8 +5,6 @@
 
 'use strict'
 
-const HealthReporter = require('./lib/health-reporter')
-
 // Record opening times before loading any other files.
 const preAgentTime = process.uptime()
 const agentStart = Date.now()
@@ -156,7 +154,6 @@ function createAgent(config) {
       'New Relic requires that you name this application!\n' +
       'Set app_name in your newrelic.js or newrelic.cjs file or set environment variable\n' +
       'NEW_RELIC_APP_NAME. Not starting!'
-    agent.healthReporter.setStatus(HealthReporter.STATUS_MISSING_APP_NAME)
     throw new Error(message)
   }
 
@@ -170,7 +167,6 @@ function createAgent(config) {
 
   agent.start(function afterStart(error) {
     if (error) {
-      agent.healthReporter.setStatus(HealthReporter.STATUS_INTERNAL_UNEXPECTED_ERROR)
       const errorMessage = 'New Relic for Node.js halted startup due to an error:'
       logger.error(error, errorMessage)
 

@@ -10,7 +10,6 @@ const assert = require('node:assert')
 const path = require('path')
 
 const Config = require('../../../lib/config')
-const proxyquire = require('proxyquire')
 
 test('with default properties', async (t) => {
   let configuration = null
@@ -315,69 +314,5 @@ test('with default properties', async (t) => {
     assert.equal(configuration.instrumentation.express.enabled, true)
     assert.equal(configuration.instrumentation['@prisma/client'].enabled, true)
     assert.equal(configuration.instrumentation.npmlog.enabled, true)
-  })
-})
-
-test('with undefined as default', async (t) => {
-  const mockConfig = {
-    fake_key: {
-      another_layer: {
-        fake_nested_key: {
-          default: undefined
-        }
-      }
-    }
-  }
-
-  const defaults = require('../../../lib/config/default')
-  const orig = defaults.definition
-  defaults.definition = function stub() {
-    const configDefaults = orig.apply(this, arguments)
-    return { ...configDefaults, ...mockConfig }
-  }
-  const Config = proxyquire('../../../lib/config', {
-    './default': defaults
-  })
-
-  const configuration = Config.initialize({
-    fake_key: {
-      another_layer: {
-        fake_nested_key: 'fake-value'
-      }
-    }
-  })
-
-  assert.equal(configuration.fake_key.another_layer.fake_nested_key, 'fake-value')
-})
-
-test('agent control', async t => {
-  await t.test('loads defaults', () => {
-    const config = Config.initialize({})
-    assert.deepStrictEqual(config.agent_control, {
-      enabled: false,
-      health: {
-        delivery_location: 'file:///newrelic/apm/health',
-        frequency: 5
-      }
-    })
-  })
-
-  await t.test('loads agent control settings from provided config', () => {
-    const config = Config.initialize({
-      agent_control: {
-        enabled: true,
-        health: {
-          delivery_location: 'file://find/me',
-          frequency: 10
-        }
-      }
-    })
-    assert.deepStrictEqual(config.agent_control, {
-      enabled: true,
-      health: {
-        delivery_location: 'file://find/me',
-        frequency: 10
-      }
-    })
   })
 })
