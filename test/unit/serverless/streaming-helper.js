@@ -6,6 +6,7 @@
 'use strict'
 
 const { HttpsResponseStream } = require('./HttpsResponseStream')
+const { Writable } = require('node:stream')
 
 const HANDLER_STREAMING = Symbol.for('aws.lambda.runtime.handler.streaming')
 const HANDLER_HIGHWATERMARK = Symbol.for(
@@ -26,40 +27,32 @@ const awslambda = {
   HttpsResponseStream,
 }
 
-// Sample function adapted from
-// https://github.com/aws-samples/serverless-patterns/blob/main/lambda-streaming-ttfb-write-sam/src/index.js
-const sampleFunction = async (event, responseStream, context) => {
-  const httpResponseMetadata = {
-    statusCode: 200,
-    headers: {
-      'Content-Type': 'text/html',
-      'X-Custom-Header': 'NewRelic-Test-Header'
-    }
+class WriteStream extends Writable {
+  constructor(options) {
+    super(options)
+    this._value = []
+    this._contentType = 'string'
   }
 
-  responseStream = awslambda.HttpResponseStream.from(responseStream, httpResponseMetadata)
+  _write(chunk, encoding, callback) {
+    this._value.push(chunk)
+    callback()
+  }
 
-  responseStream.write('<html>')
-  responseStream.write('<head>')
-  responseStream.write('<title>Streaming HTML page</title>')
-  responseStream.write('</head>')
-  responseStream.write('<body>')
+  setContentType(ctype) {
+    this._contentType = ctype
+  }
 
-  responseStream.write('<h1>H1 of streaming page</h1>')
-  await new Promise((resolve) => setTimeout(resolve, 100))
-  responseStream.write('<h2>H2 of streaming page</h2>')
-  await new Promise((resolve) => setTimeout(resolve, 100))
-  responseStream.write('<h3>H3 of streaming page</h3>')
-  await new Promise((resolve) => setTimeout(resolve, 100))
-
-  const loremIpsum = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Pellentesque interdum non lectus id faucibus. Fusce in metus ut diam placerat lacinia. Proin fringilla massa non dignissim ultricies. Integer nec mollis purus. Nunc sollicitudin enim vitae eros commodo, sed faucibus lacus ultrices. Vestibulum euismod dictum turpis et porttitor. Sed ultrices, ipsum nec condimentum dignissim, velit lacus viverra nisl, eu accumsan tellus lectus et tellus. Etiam porta faucibus lacus, at congue felis congue sit amet. Integer iaculis fringilla sagittis. Vestibulum at orci ipsum. Suspendisse eros sapien, condimentum nec condimentum pretium, luctus vitae leo. Aenean ultrices mauris accumsan mollis mattis. Pellentesque pretium facilisis sapien quis hendrerit. Cras enim tortor, tristique ac libero ut, rhoncus pretium sem. Nullam aliquet lorem id est porta pharetra. Nunc posuere non ipsum eget congue.'
-  responseStream.write(`<p>${loremIpsum}</p>`)
-  await new Promise((resolve) => setTimeout(resolve, 100))
-
-  responseStream.write('<p>And that is the end of the stream.</p>')
-  responseStream.write('</body>')
-  responseStream.write('</html>')
-  responseStream.end()
+  getValue(type) {
+    const valueArray = []
+    if (type === 'string') {
+      this._value.forEach(buf => {
+        valueArray.push(buf.toString('utf8'))
+      })
+      return valueArray.join('\n')
+    }
+    return this._value
+  }
 }
 
-module.exports = { lambdaBuiltIns: awslambda, constants: { HANDLER_STREAMING }, sampleFunction }
+module.exports = { lambdaBuiltIns: awslambda, WriteStream, constants: { HANDLER_STREAMING } }

@@ -8,7 +8,6 @@
 const test = require('node:test')
 const assert = require('node:assert')
 const os = require('node:os')
-const { Writable } = require('node:stream')
 
 const { tspl } = require('@matteo.collina/tspl')
 const helper = require('../../lib/agent_helper')
@@ -17,7 +16,7 @@ const tempOverrideUncaught = require('../../lib/temp-override-uncaught')
 const AwsLambda = require('../../../lib/serverless/aws-lambda')
 const lambdaSampleEvents = require('./lambda-sample-events')
 
-const { lambdaBuiltIns, sampleFunction } = require('./streaming-helper')
+const { lambdaBuiltIns, WriteStream } = require('./streaming-helper')
 
 const { DESTINATIONS: ATTR_DEST } = require('../../../lib/config/attribute-filter')
 const symbols = require('../../../lib/symbols')
@@ -48,6 +47,13 @@ test('AwsLambda.patchLambdaHandler', async (t) => {
       'X-Custom-Header': 'NewRelic-Test-Header'
     }
   }
+  // Used by API Gateway response tests
+  const validResponse = {
+    isBase64Encoded: false,
+    statusCode: 200,
+    headers: { responseHeader: 'headerValue' },
+    body: 'a valid response string'
+  }
   const writeStreamResponse = async (chunks, responseStream, delay) => {
     chunks.forEach(chunk => {
       responseStream.write(chunk)
@@ -73,16 +79,16 @@ test('AwsLambda.patchLambdaHandler', async (t) => {
 
     ctx.nr.stubEvent = {}
     ctx.nr.stubContext = {
-      done() { },
-      succeed() { },
-      fail() { },
+      done() {},
+      succeed() {},
+      fail() {},
       functionName,
       functionVersion: 'TestVersion',
       invokedFunctionArn: 'arn:test:function',
       memoryLimitInMB: '128',
       awsRequestId: 'testid'
     }
-    ctx.nr.stubResponseStream = new Writable()
+    ctx.nr.stubResponseStream = new WriteStream()
 
     process.env.AWS_EXECUTION_ENV = 'Test_nodejsNegative2.3'
 
@@ -294,8 +300,8 @@ test('AwsLambda.patchLambdaHandler', async (t) => {
       const handler = lambdaBuiltIns.streamifyResponse(async (event, responseStream, context) => {
         responseStream = lambdaBuiltIns.HttpsResponseStream.from(responseStream, validStreamMetaData)
         const chunks = ['capturing req params 1', 'capturing req params 2', 'capturing req params 3']
-        const stream = writeStreamResponse(chunks, responseStream, 500)
-        stream.end()
+        await writeStreamResponse(chunks, responseStream, 500)
+        responseStream.end()
       })
 
       const wrappedHandler = awsLambda.patchLambdaHandler(handler)
@@ -325,8 +331,8 @@ test('AwsLambda.patchLambdaHandler', async (t) => {
       const handler = lambdaBuiltIns.streamifyResponse(async (event, responseStream, context) => {
         responseStream = lambdaBuiltIns.HttpsResponseStream.from(responseStream, validStreamMetaData)
         const chunks = ['params in spans 1', 'params in spans 2', 'params in spans 3']
-        const stream = writeStreamResponse(chunks, responseStream, 500)
-        stream.end()
+        await writeStreamResponse(chunks, responseStream, 500)
+        responseStream.end()
       })
 
       const wrappedHandler = awsLambda.patchLambdaHandler(handler)
@@ -353,8 +359,8 @@ test('AwsLambda.patchLambdaHandler', async (t) => {
       const handler = lambdaBuiltIns.streamifyResponse(async (event, responseStream, context) => {
         responseStream = lambdaBuiltIns.HttpsResponseStream.from(responseStream, validStreamMetaData)
         const chunks = ['capture headers 1', 'capture headers 2', 'capture headers 3']
-        const stream = writeStreamResponse(chunks, responseStream, 500)
-        stream.end()
+        await writeStreamResponse(chunks, responseStream, 500)
+        responseStream.end()
       })
 
       const wrappedHandler = awsLambda.patchLambdaHandler(handler)
@@ -406,8 +412,8 @@ test('AwsLambda.patchLambdaHandler', async (t) => {
       const handler = lambdaBuiltIns.streamifyResponse(async (event, responseStream, context) => {
         responseStream = lambdaBuiltIns.HttpsResponseStream.from(responseStream, validStreamMetaData)
         const chunks = ['filter by exclude 1', 'filter by exclude 2', 'filter by exclude 3']
-        const stream = writeStreamResponse(chunks, responseStream, 500)
-        stream.end()
+        await writeStreamResponse(chunks, responseStream, 500)
+        responseStream.end()
       })
       const wrappedHandler = awsLambda.patchLambdaHandler(handler)
 
@@ -447,6 +453,7 @@ test('AwsLambda.patchLambdaHandler', async (t) => {
         const chunks = ['capture statusCode 1', 'capture statusCode 2', 'capture statusCode 3']
         await writeStreamResponse(chunks, responseStream, 500)
         responseStream.end()
+        return validResponse
       })
 
       const wrappedHandler = awsLambda.patchLambdaHandler(handler)
@@ -472,18 +479,10 @@ test('AwsLambda.patchLambdaHandler', async (t) => {
       const apiGatewayProxyEvent = lambdaSampleEvents.apiGatewayProxyEvent
 
       const handler = lambdaBuiltIns.streamifyResponse(async (event, responseStream, context) => {
-        // const chunks = ['filter by exclude 1', 'filter by exclude 2', 'filter by exclude 3']
-        // await chunks.forEach(chunk => {
-        //   responseStream.write(chunk)
-        // })
-        return Promise.resolve({
-          status: 200,
-          statusCode: 200,
-          statusDescription: 'Success',
-          isBase64Encoded: false,
-          headers: {},
-          body: 'ok' // fails if we return a stream body
-        })
+        const chunks = ['chunk 1', 'chunk 2', 'chunk 3']
+        await writeStreamResponse(chunks, responseStream, 500)
+        responseStream.end()
+        return Promise.resolve(validResponse)
       })
       const wrappedHandler = awsLambda.patchLambdaHandler(handler)
 
@@ -501,14 +500,18 @@ test('AwsLambda.patchLambdaHandler', async (t) => {
       }
     })
 
-    /// started here
     await t.test('should capture response headers', (t, end) => {
       const { agent, awsLambda, stubResponseStream, stubContext } = t.nr
       agent.on('transactionFinished', confirmAgentAttribute)
 
       const apiGatewayProxyEvent = lambdaSampleEvents.apiGatewayProxyEvent
 
-      const handler = lambdaBuiltIns.streamifyResponse(sampleFunction)
+      const handler = lambdaBuiltIns.streamifyResponse(async (event, responseStream, context) => {
+        responseStream = lambdaBuiltIns.HttpsResponseStream.from(responseStream, validStreamMetaData)
+        const chunks = ['headers 1', 'headers 2', 'headers 3']
+        await writeStreamResponse(chunks, responseStream, 500)
+        responseStream.end()
+      })
 
       const wrappedHandler = awsLambda.patchLambdaHandler(handler)
 
@@ -532,8 +535,8 @@ test('AwsLambda.patchLambdaHandler', async (t) => {
       const handler = lambdaBuiltIns.streamifyResponse(async (event, responseStream, context) => {
         responseStream = lambdaBuiltIns.HttpsResponseStream.from(responseStream, { statusCode: 200 })
         const chunks = ['no headers 1', 'no headers 2', 'no headers 3']
-        const stream = writeStreamResponse(chunks, responseStream, 500)
-        stream.end()
+        await writeStreamResponse(chunks, responseStream, 500)
+        responseStream.end()
       })
 
       const wrappedHandler = awsLambda.patchLambdaHandler(handler)
@@ -558,8 +561,8 @@ test('AwsLambda.patchLambdaHandler', async (t) => {
       const handler = lambdaBuiltIns.streamifyResponse(async (event, responseStream, context) => {
         responseStream = lambdaBuiltIns.HttpsResponseStream.from(responseStream, validStreamMetaData)
         const chunks = ['step 1', 'step 2', 'step 3']
-        const stream = writeStreamResponse(chunks, responseStream, 500)
-        stream.end()
+        writeStreamResponse(chunks, responseStream, 500)
+        responseStream.end()
       })
 
       const wrappedHandler = awsLambda.patchLambdaHandler(handler)
@@ -584,8 +587,8 @@ test('AwsLambda.patchLambdaHandler', async (t) => {
       const handler = lambdaBuiltIns.streamifyResponse(async (event, responseStream, context) => {
         responseStream = lambdaBuiltIns.HttpsResponseStream.from(responseStream, validStreamMetaData)
         const chunks = ['step 1', 'step 2', 'step 3']
-        const stream = writeStreamResponse(chunks, responseStream, 500)
-        stream.end()
+        await writeStreamResponse(chunks, responseStream, 500)
+        responseStream.end()
       })
 
       const wrappedHandler = awsLambda.patchLambdaHandler(handler)
@@ -623,8 +626,8 @@ test('AwsLambda.patchLambdaHandler', async (t) => {
       const handler = lambdaBuiltIns.streamifyResponse(async (event, responseStream, context) => {
         responseStream = lambdaBuiltIns.HttpsResponseStream.from(responseStream, validStreamMetaData)
         const chunks = ['step 1', 'step 2', 'step 3']
-        const stream = writeStreamResponse(chunks, responseStream, 500)
-        stream.end()
+        await writeStreamResponse(chunks, responseStream, 500)
+        responseStream.end()
       })
 
       const wrappedHandler = awsLambda.patchLambdaHandler(handler)
@@ -1274,8 +1277,8 @@ test('AwsLambda.patchLambdaHandler', async (t) => {
         transaction = agent.tracer.getTransaction()
         responseStream = lambdaBuiltIns.HttpsResponseStream.from(responseStream, validStreamMetaData)
         const chunks = ['step 1', 'step 2', 'step 3']
-        const stream = writeStreamResponse(chunks, responseStream, 500)
-        stream.end()
+        await writeStreamResponse(chunks, responseStream, 500)
+        responseStream.end()
         context.succeed('worked')
       })
 
@@ -1509,8 +1512,8 @@ test('AwsLambda.patchLambdaHandler', async (t) => {
   })
 
   await t.test(
-    'should record error event when func is async an UnhandledPromiseRejection is thrown',
-    (t, end) => {
+    'should record error event when func is async and UnhandledPromiseRejection is thrown',
+    (t) => {
       const { agent, awsLambda, error, stubEvent, stubResponseStream, stubContext } = t.nr
       agent.on('harvestStarted', function confirmErrorCapture() {
         const errors = agent.errors.traceAggregator.errors
@@ -1549,7 +1552,6 @@ test('AwsLambda.patchLambdaHandler', async (t) => {
         handler(err) {
           assert.equal(err, error)
           assert.equal(transaction.isActive(), false)
-          end()
         }
       })
 
@@ -1600,9 +1602,6 @@ test('AwsLambda.patchLambdaHandler', async (t) => {
 
     const handler = lambdaBuiltIns.streamifyResponse(async (event, responseStream, context) => {
       transaction = agent.tracer.getTransaction()
-      responseStream = lambdaBuiltIns.HttpsResponseStream.from(responseStream, validStreamMetaData)
-      const chunks = ['step 1', 'step 2', 'step 3']
-      const stream = await writeStreamResponse(chunks, responseStream, 500)
       let called = false
       const oldEnd = transaction.end
       transaction.end = function wrappedEnd() {
@@ -1619,7 +1618,7 @@ test('AwsLambda.patchLambdaHandler', async (t) => {
         assert.equal(transaction.getFullName(), expectedBgTransactionName)
         assert.ok(transaction.isActive())
 
-        stream.end()
+        context.done(null, 'worked')
 
         assert.equal(transaction.isActive(), false)
         return resolve('hello')
