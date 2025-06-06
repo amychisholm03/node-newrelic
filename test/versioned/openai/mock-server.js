@@ -91,25 +91,30 @@ function handler(req, res) {
     res.statusCode = code
 
     if (payload.stream === true) {
+      if (body.type === 'response.completed') {
+        // TODO: For `responses.create` API
+        // openai/resources/responses/responses.js#Responses/create:19
+        // expects a `Stream` returned by client.post
+      } else {
       // OpenAI streamed responses are double newline delimited lines that
       // are prefixed with the string `data: `. The end of the stream is
       // terminated with a `done: [DONE]` string.
-      let outStream
-      if (streamData !== 'do random') {
-        outStream = finiteStream(streamData, { ...body })
-      } else {
-        outStream = randomStream({ ...body })
-        let streamChunkCount = 0
-        outStream.on('data', () => {
-          if (streamChunkCount >= 100) {
-            outStream.destroy()
-            res.destroy()
-          }
-          streamChunkCount += 1
-        })
+        let outStream
+        if (streamData !== 'do random') {
+          outStream = finiteStream(streamData, { ...body })
+        } else {
+          outStream = randomStream({ ...body })
+          let streamChunkCount = 0
+          outStream.on('data', () => {
+            if (streamChunkCount >= 100) {
+              outStream.destroy()
+              res.destroy()
+            }
+            streamChunkCount += 1
+          })
+        }
+        outStream.pipe(res)
       }
-
-      outStream.pipe(res)
     } else {
       res.write(JSON.stringify(body))
       res.end()

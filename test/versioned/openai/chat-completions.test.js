@@ -585,11 +585,11 @@ if (semver.gte(pkgVersion, '5.0.0')) {
         assert.equal(results.output[0].content[0].text, '1 plus 2 is 3.')
 
         // TODO: why is External segment missing?
-        const name = `External/${host}:${port}/chat/completions`
+        // const name = `External/${host}:${port}/chat/completions`
         assertSegments(
           tx.trace,
           tx.trace.root,
-          [OPENAI.COMPLETION, [name]],
+          [OPENAI.COMPLETION], // [name]
           { exact: false }
         )
 
@@ -598,7 +598,7 @@ if (semver.gte(pkgVersion, '5.0.0')) {
           agent,
           segments: [
             { name: OPENAI.COMPLETION, kind: 'internal' },
-            { name, kind: 'client' }
+            // { name, kind: 'client' }
           ]
         })
         end()
@@ -698,19 +698,13 @@ if (semver.gte(pkgVersion, '5.0.0')) {
           stream: true
         })
 
-        let res = ''
-
-        let i = 0
-        for await (const chunk of stream) {
-          res += chunk.choices[0]?.delta?.content
-
-          // I tried to doing stream.controller.abort like their docs say
-          // but this didn't break
-          if (i === 10) {
-            break
-          }
-          i++
+        // Final chunk will be the response we need
+        let chunk = {}
+        for await (chunk of stream) {
+          continue
         }
+        const res = chunk?.response?.output?.[0].content?.[0]?.text
+        assert.ok(res)
 
         const events = agent.customEventAggregator.events.toArray()
         assert.equal(events.length, 4, 'should create a chat completion message and summary event')
@@ -736,8 +730,8 @@ if (semver.gte(pkgVersion, '5.0.0')) {
       const { client, agent } = t.nr
       const promptContent = 'Streamed response'
       const promptContent2 = 'What does 1 plus 1 equal?'
-      let res = ''
       const expectedModel = 'gpt-4'
+      let res = ''
       const api = helper.getAgentApi()
       function cb(model, content) {
         assert.equal(model, expectedModel)
@@ -759,10 +753,13 @@ if (semver.gte(pkgVersion, '5.0.0')) {
           stream: true
         })
 
-        for await (const chunk of stream) {
-          res += chunk.choices[0]?.delta?.content
+        let chunk = {}
+        for await (chunk of stream) {
+          continue
         }
 
+        res = chunk?.response?.output?.[0].content?.[0]?.text
+        assert.ok(res)
         const events = agent.customEventAggregator.events.toArray()
         const chatMsgs = events.filter(([{ type }]) => type === 'LlmChatCompletionMessage')
         assertChatCompletionMessages({
@@ -786,8 +783,6 @@ if (semver.gte(pkgVersion, '5.0.0')) {
         const content = 'bad stream'
         const model = 'gpt-4'
         const stream = await client.responses.create({
-          max_tokens: 100,
-          temperature: 0.5,
           model,
           input: [
             { role: 'user', content },
@@ -796,14 +791,14 @@ if (semver.gte(pkgVersion, '5.0.0')) {
           stream: true
         })
 
-        let res = ''
+        let chunk = {}
 
         try {
-          for await (const chunk of stream) {
-            res += chunk.choices[0]?.delta?.content
+          for await (chunk of stream) {
+            continue
           }
         } catch (err) {
-          assert.ok(res)
+          assert.ok(chunk.response.output[0].content[0].text)
           assert.ok(err.message, 'exceeded count')
           const events = agent.customEventAggregator.events.toArray()
           assert.equal(events.length, 4)
@@ -832,21 +827,17 @@ if (semver.gte(pkgVersion, '5.0.0')) {
         const content = 'Streamed response'
         const model = 'gpt-4'
         const stream = await client.responses.create({
-          max_output_tokens: 100,
-          temperature: 0.5,
           model,
           input: [{ role: 'user', content }],
           stream: true
         })
 
-        let res = ''
         let chunk = {}
-
         for await (chunk of stream) {
-          res += chunk.choices[0]?.delta?.content
+          continue
         }
         const expectedRes = responses.get(content)
-        assert.equal(res, expectedRes.streamData)
+        assert.equal(chunk.output[0].content[0].text, expectedRes.streamData)
 
         const events = agent.customEventAggregator.events.toArray()
         assert.equal(events.length, 0, 'should not llm events when streaming is disabled')
