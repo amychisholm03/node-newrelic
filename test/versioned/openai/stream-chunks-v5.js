@@ -117,6 +117,7 @@ chunks.push({
 chunks.push({
   response: {
     id: 'resp_684886977be881928c9db234e14ae7d80f8976796514dff9',
+    model: 'gpt-4-0613',
     object: 'response',
     output: [{
       content: [{ text: 'Test stream' }],
@@ -127,10 +128,13 @@ chunks.push({
     }],
     status: 'completed',
     usage: {
-      input_tokens: 13,
-      output_tokens: 4,
-      total_tokens: 17
-    }
+      // This is incorrect for this specific stream
+      // example, but matches other mock responses,
+      // so we can use it for testing.
+      input_tokens: 11,
+      output_tokens: 53,
+      total_tokens: 64
+    },
   },
   sequence_number: 9,
   type: 'response_completed',

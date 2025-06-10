@@ -74,18 +74,20 @@ function handler(req, res) {
 
     if (payload.stream === true) {
       let outStream
-      if (streamData !== 'do random') {
-        outStream = finiteStream({ ...body })
+      if (streamData !== 'bad stream') {
+        outStream = finiteStream()
       } else {
-        outStream = randomStream({ ...body })
-        let streamChunkCount = 0
-        outStream.on('data', () => {
-          if (streamChunkCount >= 100) {
-            outStream.destroy()
-            res.destroy()
+        outStream = new Readable({
+          read() {
+            for (let i = 0; i < STREAM_CHUNKS.length; i++) {
+              const chunkString = JSON.stringify(STREAM_CHUNKS[i])
+              this.push(`data: ${chunkString}\n\n`)
+              // TODO: send an error chunk instead
+            }
+            this.push('data: [DONE]\n\n')
+            this.push(null)
           }
-          streamChunkCount += 1
-        })
+        }).pause()
       }
 
       outStream.pipe(res)
@@ -101,10 +103,9 @@ function handler(req, res) {
  * sends those chunks as OpenAI v5 data stream messages. This stream
  * has a finite number of messages that will be sent.
  *
- * @param body
  * @returns {Readable} A paused stream.
  */
-function finiteStream(body) {
+function finiteStream() {
   return new Readable({
     read() {
       // This is how the data is streamed from openai
@@ -114,24 +115,6 @@ function finiteStream(body) {
       }
       this.push('data: [DONE]\n\n')
       this.push(null)
-    }
-  }).pause()
-}
-
-/**
- * Creates a stream that will stream an infinite number of OpenAI stream data
- * chunks.
- *
- * @param {object} chunkTemplate An object that is shaped like an OpenAI stream
- * data object.
- * @returns {Readable} A paused stream.
- */
-function randomStream(chunkTemplate) {
-  return new Readable({
-    read(size = 16) {
-      const data = crypto.randomBytes(size)
-      chunkTemplate.choices[0].delta.content = data.toString('base64')
-      this.push('data: ' + JSON.stringify(chunkTemplate) + '\n\n')
     }
   }).pause()
 }

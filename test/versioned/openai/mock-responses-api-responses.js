@@ -156,7 +156,7 @@ responses.set('bad stream', {
       model: 'gpt-4-0613',
       output: [{
         content: [{
-          text: 'do random',
+          text: 'bad stream',
         }],
         role: 'assistant',
         status: 'completed',
@@ -164,5 +164,5 @@ responses.set('bad stream', {
       }]
     },
   },
-  streamData: 'do random' // For testing purposes only
+  streamData: 'bad stream' // For testing purposes only
 })
