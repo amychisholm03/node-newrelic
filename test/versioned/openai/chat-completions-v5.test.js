@@ -296,4 +296,35 @@ test('responses.create', async (t) => {
       end()
     })
   })
+
+  await t.test('should create span on successful responses stream create', (t, end) => {
+    const { client, agent, host, port } = t.nr
+    helper.runInTransaction(agent, async (tx) => {
+      const content = 'Streamed response'
+      const stream = await client.responses.create({
+        stream: true,
+        input: content,
+        model: 'gpt-4'
+      })
+
+      let chunk = {}
+      for await (chunk of stream) {
+        continue
+      }
+      assert.equal(chunk.headers, undefined, 'should remove response headers from user result')
+      assert.equal(chunk.response.output[0].role, 'assistant')
+      const expectedRes = responses.get(content)
+      assert.equal(chunk.response.output[0].content[0].text, expectedRes.body.response.output[0].content[0].text)
+
+      assertSegments(
+        tx.trace,
+        tx.trace.root,
+        [OPENAI.COMPLETION, `External/${host}:${port}/responses`],
+        { exact: false }
+      )
+
+      tx.end()
+      end()
+    })
+  })
 })

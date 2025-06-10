@@ -9,6 +9,8 @@ module.exports = openaiMockServer
 
 const http = require('node:http')
 const RESPONSES = require('./mock-responses-api-responses')
+const STREAM_CHUNKS = require('./stream-chunks-v5')
+const { Readable } = require('node:stream')
 
 /**
  * Build a mock server that listens on a 127.0.0.1 and a random port that
@@ -64,21 +66,74 @@ function handler(req, res) {
       return
     }
 
-    const { headers, code, body } = RESPONSES.get(prompt)
+    const { headers, code, body, streamData } = RESPONSES.get(prompt)
     for (const [key, value] of Object.entries(headers)) {
       res.setHeader(key, value)
     }
     res.statusCode = code
 
     if (payload.stream === true) {
-      res.statusCode = 500
-      res.write('Streaming is not yet supported in this mock server.')
-      res.end()
+      let outStream
+      if (streamData !== 'do random') {
+        outStream = finiteStream({ ...body })
+      } else {
+        outStream = randomStream({ ...body })
+        let streamChunkCount = 0
+        outStream.on('data', () => {
+          if (streamChunkCount >= 100) {
+            outStream.destroy()
+            res.destroy()
+          }
+          streamChunkCount += 1
+        })
+      }
+
+      outStream.pipe(res)
     } else {
       res.write(JSON.stringify(body))
       res.end()
     }
   })
+}
+
+/**
+ * Uses `STREAM_CHUNKS` into chunks to returns a stream that
+ * sends those chunks as OpenAI v5 data stream messages. This stream
+ * has a finite number of messages that will be sent.
+ *
+ * @param body
+ * @returns {Readable} A paused stream.
+ */
+function finiteStream(body) {
+  return new Readable({
+    read() {
+      // This is how the data is streamed from openai
+      for (let i = 0; i < STREAM_CHUNKS.length; i++) {
+        const chunkString = JSON.stringify(STREAM_CHUNKS[i])
+        this.push(`data: ${chunkString}\n\n`)
+      }
+      this.push('data: [DONE]\n\n')
+      this.push(null)
+    }
+  }).pause()
+}
+
+/**
+ * Creates a stream that will stream an infinite number of OpenAI stream data
+ * chunks.
+ *
+ * @param {object} chunkTemplate An object that is shaped like an OpenAI stream
+ * data object.
+ * @returns {Readable} A paused stream.
+ */
+function randomStream(chunkTemplate) {
+  return new Readable({
+    read(size = 16) {
+      const data = crypto.randomBytes(size)
+      chunkTemplate.choices[0].delta.content = data.toString('base64')
+      this.push('data: ' + JSON.stringify(chunkTemplate) + '\n\n')
+    }
+  }).pause()
 }
 
 function getShortenedPrompt(reqBody) {
