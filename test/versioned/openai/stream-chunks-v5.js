@@ -5,9 +5,19 @@
 
 'use strict'
 
-const chunks = []
-module.exports = chunks
+const errorChunk = {
+  response: {
+    message: 'fetch failed',
+    stack: 'TypeError: fetch failed',
+    cause: {
+      code: 'BAD_STREAM',
+      reason: 'internal error',
+      library: 'opeani',
+    }
+  }
+}
 
+const chunks = []
 // Setup chunks
 chunks.push({
   response: {
@@ -139,3 +149,5 @@ chunks.push({
   sequence_number: 9,
   type: 'response_completed',
 })
+
+module.exports = { chunks, errorChunk }

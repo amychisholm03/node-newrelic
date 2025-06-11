@@ -9,7 +9,7 @@ module.exports = openaiMockServer
 
 const http = require('node:http')
 const RESPONSES = require('./mock-responses-api-responses')
-const STREAM_CHUNKS = require('./stream-chunks-v5')
+const { chunks, errorChunk } = require('./stream-chunks-v5')
 const { Readable } = require('node:stream')
 
 /**
@@ -79,11 +79,7 @@ function handler(req, res) {
       } else {
         outStream = new Readable({
           read() {
-            for (let i = 0; i < STREAM_CHUNKS.length; i++) {
-              const chunkString = JSON.stringify(STREAM_CHUNKS[i])
-              this.push(`data: ${chunkString}\n\n`)
-              // TODO: send an error chunk instead
-            }
+            this.push(`data: ${JSON.stringify(errorChunk)}\n\n`)
             this.push('data: [DONE]\n\n')
             this.push(null)
           }
@@ -109,8 +105,8 @@ function finiteStream() {
   return new Readable({
     read() {
       // This is how the data is streamed from openai
-      for (let i = 0; i < STREAM_CHUNKS.length; i++) {
-        const chunkString = JSON.stringify(STREAM_CHUNKS[i])
+      for (let i = 0; i < chunks.length; i++) {
+        const chunkString = JSON.stringify(chunks[i])
         this.push(`data: ${chunkString}\n\n`)
       }
       this.push('data: [DONE]\n\n')

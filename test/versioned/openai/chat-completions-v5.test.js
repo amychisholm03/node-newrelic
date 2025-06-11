@@ -408,6 +408,48 @@ test('responses.create', async (t) => {
     })
   })
 
+  await t.test('handles error in stream', (t, end) => {
+    const { client, agent } = t.nr
+    helper.runInTransaction(agent, async (tx) => {
+      const content = 'bad stream'
+      const model = 'gpt-4'
+
+      try {
+        const stream = await client.responses.create({
+          max_tokens: 100,
+          temperature: 0.5,
+          model,
+          input: [
+            { role: 'user', content },
+            { role: 'user', content: 'What does 1 plus 1 equal?' }
+          ],
+          stream: true
+        })
+        for await (const chunk of stream) {
+          continue
+        }
+      } catch (err) {
+        assert.ok(err.message, 'exceeded count')
+        const events = agent.customEventAggregator.events.toArray()
+        assert.equal(events.length, 4)
+        const chatSummary = events.filter(([{ type }]) => type === 'LlmChatCompletionSummary')[0]
+        assertChatCompletionSummary({ tx, model, chatSummary, error: true })
+        assert.equal(tx.exceptions.length, 1)
+        // only asserting message and completion_id as the rest of the attrs
+        // are asserted in other tests
+        match(tx.exceptions[0], {
+          customAttributes: {
+            'error.message': /terminated|Premature close/,
+            completion_id: /\w{32}/
+          }
+        })
+
+        tx.end()
+        end()
+      }
+    })
+  })
+
   await t.test('should not create llm events when ai_monitoring.streaming.enabled is false', (t, end) => {
     const { client, agent } = t.nr
     agent.config.ai_monitoring.streaming.enabled = false
