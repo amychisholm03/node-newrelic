@@ -6,10 +6,10 @@
   "tests": [
     {
       "engines": {
-        "node": ">=18"
+        "node": ">=20"
       },
       "dependencies": {
-        "pino": ">=7.0.0",
+        "pino": ">=8.0.0",
         "flush-write-stream": "2.0.0",
         "split2": "4.1.0"
       },
@@ -20,10 +20,10 @@
 
     {
       "engines": {
-        "node": ">=18"
+        "node": ">=20"
       },
       "dependencies": {
-        "pino": ">=7.0.0",
+        "pino": ">=8.0.0",
         "pino-http": ">=10.3.0"
       },
       "files": [
