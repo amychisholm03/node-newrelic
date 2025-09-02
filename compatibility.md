@@ -25,7 +25,7 @@ supported by the agent.
 | `@grpc/grpc-js` | 1.4.0 | 1.13.4 | 8.17.0 |
 | `@hapi/hapi` | 20.1.2 | 21.4.3 | 9.0.0 |
 | `@koa/router` | 12.0.1 | 14.0.0 | 3.2.0 |
-| `@langchain/core` | 0.1.17 | 0.3.72 | 11.13.0 |
+| `@langchain/core` | 0.1.17 | 0.3.73 | 11.13.0 |
 | `@modelcontextprotocol/sdk` | 1.13.0 | 1.17.5 | 13.2.0 |
 | `@nestjs/cli` | 9.0.0 | 11.0.10 | 10.1.0 |
 | `@opensearch-project/opensearch` | 2.1.0 | 3.5.1 | 12.10.0 |
