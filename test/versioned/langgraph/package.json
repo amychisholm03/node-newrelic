@@ -1,0 +1,29 @@
+{
+  "name": "langgraph-tests",
+  "targets": [
+    {
+      "name": "@langchain/langgraph",
+      "minSupported": "0.2.0",
+      "minAgentVersion": "12.8.0"
+    }
+  ],
+  "version": "0.0.0",
+  "private": true,
+  "engines": {
+    "node": ">=20"
+  },
+  "tests": [
+    {
+      "engines": {
+        "node": ">=20"
+      },
+      "dependencies": {
+        "@langchain/langgraph": ">=0.2.0",
+        "@langchain/core": ">=0.3.0"
+      },
+      "files": [
+        "graph-invoke.test.js"
+      ]
+    }
+  ]
+}
