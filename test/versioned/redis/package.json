@@ -9,17 +9,7 @@
   "version": "0.0.0",
   "private": true,
   "tests": [
-    {
-      "engines": {
-        "node": ">=20"
-      },
-      "dependencies": {
-        "redis": ">=3.1.0 < 4.0.0"
-      },
-      "files": [
-        "redis-v3.test.js"
-      ]
-    },
+  
     {
       "engines": {
         "node": ">=20"
@@ -34,8 +24,5 @@
         "tls.test.js"
       ]
     }
-  ],
-  "dependencies": {
-    "redis": "^4.7.1"
-  }
+  ]
 }
