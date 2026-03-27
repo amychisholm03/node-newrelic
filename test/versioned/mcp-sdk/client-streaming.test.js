@@ -10,7 +10,7 @@ const assert = require('node:assert')
 
 const { removeModules } = require('../../lib/cache-buster')
 const helper = require('../../lib/agent_helper')
-const { assertPackageMetrics, assertSegments, assertSpanKind } = require('../../lib/custom-assertions')
+const { assertPackageMetrics, assertSegmentDuration, assertSegments, assertSpanKind } = require('../../lib/custom-assertions')
 const {
   MCP
 } = require('../../../lib/metrics/names')
@@ -68,15 +68,19 @@ test('should log package tracking metrics', (t) => {
 test('should create span for callTool', (t, end) => {
   const { agent, client } = t.nr
   helper.runInTransaction(agent, async (tx) => {
+    const start = process.hrtime()
     const result = await client.callTool({
       name: 'echo',
       arguments: {
         message: 'example message'
       }
     })
+    const actualTime = process.hrtime(start)
     assert.ok(result, 'should return a result from the tool call')
     const name = `${MCP.TOOL}/callTool/echo`
     assertSegments(tx.trace, tx.trace.root, [name], { exact: false })
+    const [segment] = tx.trace.getChildren(tx.trace.root.id)
+    assertSegmentDuration({ segment, actualTime })
     tx.end()
     assertSpanKind({
       agent,
@@ -92,14 +96,18 @@ test('should create span for callTool', (t, end) => {
 test('should create span for readResource', (t, end) => {
   const { agent, client } = t.nr
   helper.runInTransaction(agent, async (tx) => {
+    const start = process.hrtime()
     const resource = await client.readResource({
       uri: 'echo://hello-world',
     })
+    const actualTime = process.hrtime(start)
 
     assert.ok(resource, 'should return a resource from readResource')
 
     const name = `${MCP.RESOURCE}/readResource/echo`
     assertSegments(tx.trace, tx.trace.root, [name], { exact: false })
+    const [segment] = tx.trace.getChildren(tx.trace.root.id)
+    assertSegmentDuration({ segment, actualTime })
 
     tx.end()
     assertSpanKind({
@@ -116,17 +124,21 @@ test('should create span for readResource', (t, end) => {
 test('should create span for getPrompt', (t, end) => {
   const { agent, client } = t.nr
   helper.runInTransaction(agent, async (tx) => {
+    const start = process.hrtime()
     const prompt = await client.getPrompt({
       name: 'echo',
       arguments: {
         message: 'example message'
       }
     })
+    const actualTime = process.hrtime(start)
 
     assert.ok(prompt, 'should return a prompt from getPrompt')
 
     const name = `${MCP.PROMPT}/getPrompt/echo`
     assertSegments(tx.trace, tx.trace.root, [name], { exact: false })
+    const [segment] = tx.trace.getChildren(tx.trace.root.id)
+    assertSegmentDuration({ segment, actualTime })
 
     tx.end()
     assertSpanKind({

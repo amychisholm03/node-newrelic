@@ -10,7 +10,7 @@ const assert = require('node:assert')
 const helper = require('../../lib/agent_helper')
 const params = require('../../lib/params')
 const { getMetricHostName } = require('../../lib/metrics_helper')
-const { assertPackageMetrics, assertMetrics, assertSegments, assertSpanKind } = require('../../lib/custom-assertions')
+const { assertPackageMetrics, assertMetrics, assertSegments, assertSegmentDuration, assertSpanKind } = require('../../lib/custom-assertions')
 
 test('memcached instrumentation', { timeout: 5000 }, async function (t) {
   await t.test('generates correct metrics and trace segments', async function (t) {
@@ -57,7 +57,8 @@ test('memcached instrumentation', { timeout: 5000 }, async function (t) {
             resolve({ segment: agent.tracer.getSegment(), actualTime: end })
           })
         })
-        assertSegmentState(segment, 'Datastore/operation/Memcache/touch', actualTime)
+        assert.equal(segment.name, 'Datastore/operation/Memcache/touch')
+        assertSegmentDuration({ segment, actualTime })
 
         assertSegments(
           transaction.trace,
@@ -103,7 +104,8 @@ test('memcached instrumentation', { timeout: 5000 }, async function (t) {
             resolve({ segment: agent.tracer.getSegment(), actualTime: end })
           })
         })
-        assertSegmentState(segment, 'Datastore/operation/Memcache/get', actualTime)
+        assert.equal(segment.name, 'Datastore/operation/Memcache/get')
+        assertSegmentDuration({ segment, actualTime })
 
         assertSegments(
           transaction.trace,
@@ -143,7 +145,8 @@ test('memcached instrumentation', { timeout: 5000 }, async function (t) {
             resolve({ segment: agent.tracer.getSegment(), actualTime: end })
           })
         })
-        assertSegmentState(segment, 'Datastore/operation/Memcache/gets', actualTime)
+        assert.equal(segment.name, 'Datastore/operation/Memcache/gets')
+        assertSegmentDuration({ segment, actualTime })
 
         assertSegments(
           transaction.trace,
@@ -183,7 +186,8 @@ test('memcached instrumentation', { timeout: 5000 }, async function (t) {
             resolve({ segment: agent.tracer.getSegment(), actualTime: end })
           })
         })
-        assertSegmentState(segment, 'Datastore/operation/Memcache/get', actualTime)
+        assert.equal(segment.name, 'Datastore/operation/Memcache/get')
+        assertSegmentDuration({ segment, actualTime })
 
         assertSegments(
           transaction.trace,
@@ -223,7 +227,8 @@ test('memcached instrumentation', { timeout: 5000 }, async function (t) {
             resolve({ segment: agent.tracer.getSegment(), actualTime: end })
           })
         })
-        assertSegmentState(segment, 'Datastore/operation/Memcache/set', actualTime)
+        assert.equal(segment.name, 'Datastore/operation/Memcache/set')
+        assertSegmentDuration({ segment, actualTime })
 
         assertSegments(
           transaction.trace,
@@ -267,7 +272,8 @@ test('memcached instrumentation', { timeout: 5000 }, async function (t) {
             resolve({ segment: agent.tracer.getSegment(), actualTime: end })
           })
         })
-        assertSegmentState(segment, 'Datastore/operation/Memcache/replace', actualTime)
+        assert.equal(segment.name, 'Datastore/operation/Memcache/replace')
+        assertSegmentDuration({ segment, actualTime })
 
         assertSegments(
           transaction.trace,
@@ -307,7 +313,8 @@ test('memcached instrumentation', { timeout: 5000 }, async function (t) {
             resolve({ segment: agent.tracer.getSegment(), actualTime: end })
           })
         })
-        assertSegmentState(segment, 'Datastore/operation/Memcache/add', actualTime)
+        assert.equal(segment.name, 'Datastore/operation/Memcache/add')
+        assertSegmentDuration({ segment, actualTime })
 
         assertSegments(
           transaction.trace,
@@ -355,7 +362,8 @@ test('memcached instrumentation', { timeout: 5000 }, async function (t) {
             resolve({ segment: agent.tracer.getSegment(), actualTime: end })
           })
         })
-        assertSegmentState(segment, 'Datastore/operation/Memcache/cas', actualTime)
+        assert.equal(segment.name, 'Datastore/operation/Memcache/cas')
+        assertSegmentDuration({ segment, actualTime })
 
         assertSegments(
           transaction.trace,
@@ -399,7 +407,8 @@ test('memcached instrumentation', { timeout: 5000 }, async function (t) {
             resolve({ segment: agent.tracer.getSegment(), actualTime: end })
           })
         })
-        assertSegmentState(segment, 'Datastore/operation/Memcache/append', actualTime)
+        assert.equal(segment.name, 'Datastore/operation/Memcache/append')
+        assertSegmentDuration({ segment, actualTime })
 
         assertSegments(
           transaction.trace,
@@ -442,7 +451,8 @@ test('memcached instrumentation', { timeout: 5000 }, async function (t) {
             resolve({ segment: agent.tracer.getSegment(), actualTime: end })
           })
         })
-        assertSegmentState(segment, 'Datastore/operation/Memcache/prepend', actualTime)
+        assert.equal(segment.name, 'Datastore/operation/Memcache/prepend')
+        assertSegmentDuration({ segment, actualTime })
 
         assertSegments(
           transaction.trace,
@@ -486,7 +496,8 @@ test('memcached instrumentation', { timeout: 5000 }, async function (t) {
             resolve({ segment: agent.tracer.getSegment(), actualTime: end })
           })
         })
-        assertSegmentState(segment, 'Datastore/operation/Memcache/delete', actualTime)
+        assert.equal(segment.name, 'Datastore/operation/Memcache/delete')
+        assertSegmentDuration({ segment, actualTime })
 
         assertSegments(
           transaction.trace,
@@ -526,7 +537,8 @@ test('memcached instrumentation', { timeout: 5000 }, async function (t) {
             resolve({ segment: agent.tracer.getSegment(), actualTime: end })
           })
         })
-        assertSegmentState(segment, 'Datastore/operation/Memcache/incr', actualTime)
+        assert.equal(segment.name, 'Datastore/operation/Memcache/incr')
+        assertSegmentDuration({ segment, actualTime })
 
         assertSegments(
           transaction.trace,
@@ -566,7 +578,8 @@ test('memcached instrumentation', { timeout: 5000 }, async function (t) {
             resolve({ segment: agent.tracer.getSegment(), actualTime: end })
           })
         })
-        assertSegmentState(segment, 'Datastore/operation/Memcache/decr', actualTime)
+        assert.equal(segment.name, 'Datastore/operation/Memcache/decr')
+        assertSegmentDuration({ segment, actualTime })
 
         assertSegments(
           transaction.trace,
@@ -607,7 +620,8 @@ test('memcached instrumentation', { timeout: 5000 }, async function (t) {
             resolve({ segment: agent.tracer.getSegment(), actualTime: end })
           })
         })
-        assertSegmentState(segment, 'Datastore/operation/Memcache/version', actualTime)
+        assert.equal(segment.name, 'Datastore/operation/Memcache/version')
+        assertSegmentDuration({ segment, actualTime })
 
         assertSegments(
           transaction.trace,
@@ -949,27 +963,6 @@ test('memcached instrumentation', { timeout: 5000 }, async function (t) {
     })
   })
 })
-
-function hrToMillis(hr) {
-  return hr[0] * 1e3 + hr[1] / 1e6
-}
-
-/**
- * Asserts that the current segment has the expected name, has ended,
- * and has a duration within a reasonable threshold of the actual measured time.
- * @param {TraceSegment} segment segment to check
- * @param {string} expectedName expected segment name
- * @param {Array} actualTime process.hrtime() duration of the actual call
- */
-function assertSegmentState(segment, expectedName, actualTime) {
-  assert.equal(segment.name, expectedName)
-  assert.equal(segment._isEnded(), true, 'segment should have ended')
-  const segmentDuration = segment.getDurationInMillis()
-  const actualDuration = hrToMillis(actualTime)
-  console.debug(`segment duration: ${segmentDuration}, actualDuration: ${actualDuration}`)
-  // TODO: Figure out a better way to assert segment durations; what is a good non-flaky threshold?
-  assert.ok(actualDuration > segmentDuration, 'actual duration should always be greater than segment duration')
-}
 
 /**
  * Checks the database segment attributes, host and port.

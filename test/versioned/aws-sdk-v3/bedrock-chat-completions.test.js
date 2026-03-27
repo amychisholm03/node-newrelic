@@ -14,7 +14,7 @@ const {
 const helper = require('../../lib/agent_helper')
 const { FAKE_CREDENTIALS, getAiResponseServer } = require('../../lib/aws-server-stubs')
 const { DESTINATIONS } = require('../../../lib/config/attribute-filter')
-const { assertSegments, match } = require('../../lib/custom-assertions')
+const { assertSegmentDuration, assertSegments, match } = require('../../lib/custom-assertions')
 const promiseResolvers = require('../../lib/promise-resolvers')
 const { tspl } = require('@matteo.collina/tspl')
 const createAiResponseServer = getAiResponseServer(__dirname)
@@ -151,11 +151,16 @@ test('Chat completions', async (t) => {
       const api = helper.getAgentApi()
       await helper.runInTransaction(agent, async (tx) => {
         api.addCustomAttribute('llm.conversation_id', 'convo-id')
+        const start = process.hrtime()
         await client.send(command)
+        const actualTime = process.hrtime(start)
         const events = agent.customEventAggregator.events.toArray()
         assert.equal(events.length, 3)
         const chatSummary = events.filter(([{ type }]) => type === 'LlmChatCompletionSummary')[0]
         const chatMsgs = events.filter(([{ type }]) => type === 'LlmChatCompletionMessage')
+
+        const [segment] = tx.trace.getChildren(tx.trace.root.id)
+        assertSegmentDuration({ segment, actualTime })
 
         assertChatCompletionMessages({
           modelId,
@@ -250,16 +255,21 @@ test('Chat completions', async (t) => {
       await helper.runInTransaction(agent, async (tx) => {
         api.addCustomAttribute('llm.conversation_id', 'convo-id')
 
+        const start = process.hrtime()
         const response = await client.send(command)
         for await (const event of response.body) {
           // no-op iteration over the stream in order to exercise the instrumentation
           consumeStreamChunk(event)
         }
+        const actualTime = process.hrtime(start)
 
         const events = agent.customEventAggregator.events.toArray()
         const chatSummary = events.filter(([{ type }]) => type === 'LlmChatCompletionSummary')[0]
         const chatMsgs = events.filter(([{ type }]) => type === 'LlmChatCompletionMessage')
         assert.equal(events.length > 2, true)
+
+        const [segment] = tx.trace.getChildren(tx.trace.root.id)
+        assertSegmentDuration({ segment, actualTime })
 
         assertChatCompletionMessages({
           modelId,

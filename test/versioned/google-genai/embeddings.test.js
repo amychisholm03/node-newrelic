@@ -8,7 +8,7 @@
 const test = require('node:test')
 const assert = require('node:assert')
 const { removeModules } = require('../../lib/cache-buster')
-const { assertSegments, assertSpanKind, match } = require('../../lib/custom-assertions')
+const { assertSegments, assertSegmentDuration, assertSpanKind, match } = require('../../lib/custom-assertions')
 const GoogleGenAIMockServer = require('./mock-server')
 const helper = require('../../lib/agent_helper')
 
@@ -99,14 +99,17 @@ test('should increment tracking metric for each embedding event', (t, end) => {
 test('should create an embedding message', (t, end) => {
   const { client, agent } = t.nr
   helper.runInTransaction(agent, async (tx) => {
+    const now = process.hrtime()
     await client.models.embedContent({
       contents: 'This is an embedding test.',
       model: 'text-embedding-004'
     })
+    const actualTime = process.hrtime(now)
     const events = agent.customEventAggregator.events.toArray()
     assert.equal(events.length, 1, 'should create a chat completion message and summary event')
     const [embedding] = events
     const [segment] = tx.trace.getChildren(tx.trace.root.id)
+    assertSegmentDuration({ segment, actualTime })
     const expectedEmbedding = {
       duration: segment.getDurationInMillis(),
       id: /[a-f0-9]{32}/,

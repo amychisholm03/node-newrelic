@@ -7,7 +7,7 @@
 const assert = require('node:assert')
 const test = require('node:test')
 const helper = require('../../lib/agent_helper')
-const { assertSegments, match } = require('../../lib/custom-assertions')
+const { assertSegmentDuration, assertSegments, match } = require('../../lib/custom-assertions')
 const { FAKE_CREDENTIALS, getAiResponseServer } = require('../../lib/aws-server-stubs')
 const { DESTINATIONS } = require('../../../lib/config/attribute-filter')
 const createAiResponseServer = getAiResponseServer(__dirname)
@@ -87,11 +87,14 @@ test('Embeddings', async (t) => {
       const command = new bedrock.InvokeModelCommand(input)
 
       await helper.runInTransaction(agent, async (tx) => {
+        const start = process.hrtime()
         await client.send(command)
+        const actualTime = process.hrtime(start)
         const events = agent.customEventAggregator.events.toArray()
         assert.equal(events.length, 1)
         const embedding = events.filter(([{ type }]) => type === 'LlmEmbedding')[0]
         const [segment] = tx.trace.getChildren(tx.trace.root.id)
+        assertSegmentDuration({ segment, actualTime })
         const expectedEmbedding = {
           id: /[a-f0-9]{32}/,
           request_id: 'eda0760a-c3f0-4fc1-9a1e-75559d642866',
@@ -124,16 +127,19 @@ test('Embeddings', async (t) => {
       }
 
       await helper.runInTransaction(agent, async (tx) => {
+        const start = process.hrtime()
         const response = await client.send(command)
         for await (const event of response.body) {
           // no-op iteration over the stream in order to exercise the instrumentation
           consumeStreamChunk(event)
         }
+        const actualTime = process.hrtime(start)
 
         const events = agent.customEventAggregator.events.toArray()
         assert.equal(events.length, 1)
         const embedding = events.filter(([{ type }]) => type === 'LlmEmbedding')[0]
         const [segment] = tx.trace.getChildren(tx.trace.root.id)
+        assertSegmentDuration({ segment, actualTime })
         const expectedEmbedding = {
           id: /[a-f0-9]{32}/,
           request_id: 'eda0760a-c3f0-4fc1-9a1e-75559d642866',
@@ -164,12 +170,14 @@ test('Embeddings', async (t) => {
       const expectedType = 'ValidationException'
 
       await helper.runInTransaction(agent, async (tx) => {
+        const start = process.hrtime()
         try {
           await client.send(command)
         } catch (err) {
           assert.equal(err.message, expectedMsg)
           assert.equal(err.name, expectedType)
         }
+        const actualTime = process.hrtime(start)
         assert.equal(tx.exceptions.length, 1)
         match(tx.exceptions[0], {
           error: {
@@ -197,6 +205,7 @@ test('Embeddings', async (t) => {
         assert.equal(events.length, 1)
         const embedding = events.filter(([{ type }]) => type === 'LlmEmbedding')[0]
         const [segment] = tx.trace.getChildren(tx.trace.root.id)
+        assertSegmentDuration({ segment, actualTime })
         const expectedEmbedding = {
           id: /[a-f0-9]{32}/,
           request_id: '743dd35b-744b-4ddf-b5c6-c0f3de2e3142',

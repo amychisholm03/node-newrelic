@@ -10,7 +10,7 @@ const assert = require('node:assert')
 const { tspl } = require('@matteo.collina/tspl')
 
 const { removeModules } = require('../../lib/cache-buster')
-const { assertSegments, assertSpanKind, match } = require('../../lib/custom-assertions')
+const { assertSegments, assertSegmentDuration, assertSpanKind, match } = require('../../lib/custom-assertions')
 const createOpenAIMockServer = require('./mock-server-res-api')
 const helper = require('../../lib/agent_helper')
 const { findSegment } = require('../../lib/metrics_helper')
@@ -123,6 +123,7 @@ test('responses.create', async (t) => {
     helper.runInTransaction(agent, async (tx) => {
       const model = 'gpt-4'
       const content = 'You are a mathematician.'
+      const now = process.hrtime()
       await client.responses.create({
         model,
         input: [
@@ -130,6 +131,7 @@ test('responses.create', async (t) => {
           { role: 'user', content: 'What does 1 plus 1 equal?' }
         ]
       })
+      const actualTime = process.hrtime(now)
 
       const events = agent.customEventAggregator.events.toArray()
       assert.equal(events.length, 4, 'should create a chat completion message and summary event')
@@ -148,6 +150,9 @@ test('responses.create', async (t) => {
       const chatSummary = events.filter(([{ type }]) => type === 'LlmChatCompletionSummary')[0]
       assertChatCompletionSummary({ tx, model, chatSummary })
       assert.equal(chatSummary[0].timestamp, chatSummary[1].timestamp, 'time added to event aggregator should equal `timestamp` property')
+
+      const [segment] = tx.trace.getChildren(tx.trace.root.id)
+      assertSegmentDuration({ segment, actualTime })
 
       tx.end()
       end()

@@ -8,7 +8,7 @@
 const test = require('node:test')
 const assert = require('node:assert')
 const { removeModules } = require('../../lib/cache-buster')
-const { assertPackageMetrics, assertSegments, assertSpanKind, match } = require('../../lib/custom-assertions')
+const { assertPackageMetrics, assertSegments, assertSegmentDuration, assertSpanKind, match } = require('../../lib/custom-assertions')
 const { assertChatCompletionMessages, assertChatCompletionSummary } = require('./common')
 const GoogleGenAIMockServer = require('./mock-server')
 const helper = require('../../lib/agent_helper')
@@ -122,6 +122,7 @@ test('should create chat completion message and summary for every message sent',
   helper.runInTransaction(agent, async (tx) => {
     const model = 'gemini-2.0-flash'
     const content = 'You are a mathematician.'
+    const now = process.hrtime()
     await client.models.generateContent({
       model,
       contents: [content, 'What does 1 plus 1 equal?'],
@@ -130,6 +131,7 @@ test('should create chat completion message and summary for every message sent',
         temperature: 0.5
       }
     })
+    const actualTime = process.hrtime(now)
 
     const events = agent.customEventAggregator.events.toArray()
     assert.equal(events.length, 4, 'should create a chat completion message and summary event')
@@ -146,6 +148,9 @@ test('should create chat completion message and summary for every message sent',
 
     const chatSummary = events.filter(([{ type }]) => type === 'LlmChatCompletionSummary')[0]
     assertChatCompletionSummary({ tx, model, chatSummary })
+
+    const [segment] = tx.trace.getChildren(tx.trace.root.id)
+    assertSegmentDuration({ segment, actualTime })
     assert.equal(chatSummary[0].timestamp, chatSummary[1].timestamp, 'time added to event aggregator should equal `timestamp` property')
 
     tx.end()
@@ -195,6 +200,7 @@ test('should create chat completion message and summary for every message sent i
   helper.runInTransaction(agent, async (tx) => {
     const content = 'Streamed response'
     const model = 'gemini-2.0-flash'
+    const now = process.hrtime()
     const stream = await client.models.generateContentStream({
       config: {
         maxOutputTokens: 100,
@@ -209,6 +215,7 @@ test('should create chat completion message and summary for every message sent i
       assert.ok(chunk.text, 'should have text in chunk')
       res += chunk.text
     }
+    const actualTime = process.hrtime(now)
 
     const events = agent.customEventAggregator.events.toArray()
     assert.equal(events.length, 4, 'should create a chat completion message and summary event')
@@ -224,6 +231,9 @@ test('should create chat completion message and summary for every message sent i
 
     const chatSummary = events.filter(([{ type }]) => type === 'LlmChatCompletionSummary')[0]
     assertChatCompletionSummary({ tx, model, chatSummary })
+
+    const [segment] = tx.trace.getChildren(tx.trace.root.id)
+    assertSegmentDuration({ segment, actualTime })
 
     tx.end()
     end()

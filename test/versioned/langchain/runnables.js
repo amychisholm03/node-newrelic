@@ -8,7 +8,7 @@
 const test = require('node:test')
 const assert = require('node:assert')
 
-const { assertPackageMetrics, assertSegments, assertSpanKind } = require('../../lib/custom-assertions')
+const { assertPackageMetrics, assertSegments, assertSegmentDuration, assertSpanKind } = require('../../lib/custom-assertions')
 const { findSegment } = require('../../lib/metrics_helper')
 const {
   assertLangChainChatCompletionMessages,
@@ -134,7 +134,9 @@ function runRunnablesTests(config) {
       const options = { metadata: { key: 'value', hello: 'world' }, tags: ['tag1', 'tag2'] }
 
       const chain = prompt.pipe(model).pipe(outputParser)
+      const now = process.hrtime()
       await chain.invoke(input, options)
+      const actualTime = process.hrtime(now)
 
       const events = agent.customEventAggregator.events.toArray()
 
@@ -152,6 +154,9 @@ function runRunnablesTests(config) {
         tx,
         chatSummary: langChainSummaryEvents[0]
       })
+
+      const [segment] = tx.trace.getChildren(tx.trace.root.id)
+      assertSegmentDuration({ segment, actualTime })
 
       const messageAssertions = {
         tx,
