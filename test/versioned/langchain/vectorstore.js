@@ -8,7 +8,7 @@
 const test = require('node:test')
 const assert = require('node:assert')
 
-const { assertPackageMetrics, assertSegments, assertSpanKind } = require('../../lib/custom-assertions')
+const { assertPackageMetrics, assertSegmentDuration, assertSegments, assertSpanKind } = require('../../lib/custom-assertions')
 const { findSegment } = require('../../lib/metrics_helper')
 const {
   assertLangChainVectorSearch,
@@ -75,11 +75,15 @@ function runVectorstoreTests(config) {
   test('should create span on successful vectorstore create', (t, end) => {
     const { agent, vs } = t.nr
     helper.runInTransaction(agent, async (tx) => {
+      const start = process.hrtime()
       const result = await vs.similaritySearch(searchQuery, 1)
+      const actualTime = process.hrtime(start)
       assert.ok(result)
       assertSegments(tx.trace, tx.trace.root, ['Llm/vectorstore/LangChain/similaritySearch'], {
         exact: false
       })
+      const [segment] = tx.trace.getChildren(tx.trace.root.id)
+      assertSegmentDuration({ segment, actualTime })
       tx.end()
       assertSpanKind({ agent, segments: [{ name: 'Llm/vectorstore/LangChain/similaritySearch', kind: 'internal' }] })
       end()

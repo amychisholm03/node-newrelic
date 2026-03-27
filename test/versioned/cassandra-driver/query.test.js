@@ -10,6 +10,7 @@ const assert = require('node:assert')
 const semver = require('semver')
 
 const { removeModules } = require('../../lib/cache-buster')
+const { assertSegmentDuration } = require('../../lib/custom-assertions')
 const { findSegment } = require('../../lib/metrics_helper')
 const params = require('../../lib/params')
 const helper = require('../../lib/agent_helper')
@@ -199,12 +200,19 @@ test('records manual connect and shutdown', async (t) => {
     assert.ok(transaction, 'transaction should be visible')
     assert.equal(tx, transaction, 'We got the same transaction')
 
+    const connectStart = process.hrtime()
     await client.connect()
+    const connectHrTime = process.hrtime(connectStart)
+
+    const shutdownStart = process.hrtime()
     await client.shutdown()
+    const shutdownHrTime = process.hrtime(shutdownStart)
 
     const [connectSegment, shutdownSegment] = transaction.trace.getChildren(transaction.trace.root.id)
     assert.equal(connectSegment.name, 'Datastore/operation/Cassandra/connect', 'should have connect segment')
     assert.equal(shutdownSegment.name, 'Datastore/operation/Cassandra/shutdown', 'should have shutdown segment')
+    assertSegmentDuration({ segment: connectSegment, actualTime: connectHrTime })
+    assertSegmentDuration({ segment: shutdownSegment, actualTime: shutdownHrTime })
     transaction.end()
   })
 })

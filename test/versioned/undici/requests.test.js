@@ -7,7 +7,7 @@
 
 const test = require('node:test')
 const assert = require('node:assert')
-const { assertSegments, assertSpanKind } = require('../../lib/custom-assertions')
+const { assertSegmentDuration, assertSegments, assertSpanKind } = require('../../lib/custom-assertions')
 const { DESTINATIONS } = require('../../../lib/config/attribute-filter')
 const helper = require('../../lib/agent_helper')
 const metrics = require('../../lib/metrics_helper')
@@ -77,6 +77,7 @@ test('should create tracking metrics', (t, end) => {
 test('should properly name segments', async (t) => {
   const { agent, undici, HOST, REQUEST_URL } = t.nr
   await helper.runInTransaction(agent, async (tx) => {
+    const start = process.hrtime()
     const { statusCode } = await undici.request(REQUEST_URL, {
       path: '/post',
       method: 'POST',
@@ -85,10 +86,13 @@ test('should properly name segments', async (t) => {
       },
       body: Buffer.from('{"key":"value"}')
     })
+    const actualTime = process.hrtime(start)
     assert.equal(statusCode, 200)
 
     const name = `External/${HOST}/post`
     assertSegments(tx.trace, tx.trace.root, [name], { exact: false })
+    const [segment] = tx.trace.getChildren(tx.trace.root.id)
+    assertSegmentDuration({ segment, actualTime })
     tx.end()
     assertSpanKind({ agent, segments: [{ name, kind: 'client' }] })
   })
@@ -391,9 +395,13 @@ test('400 status', async (t) => {
 test('fetch', async (t) => {
   const { agent, undici, HOST, REQUEST_URL } = t.nr
   await helper.runInTransaction(agent, async (tx) => {
+    const start = process.hrtime()
     const res = await undici.fetch(REQUEST_URL)
+    const actualTime = process.hrtime(start)
     assert.equal(res.status, 200)
     assertSegments(tx.trace, tx.trace.root, [`External/${HOST}/`], { exact: false })
+    const [segment] = tx.trace.getChildren(tx.trace.root.id)
+    assertSegmentDuration({ segment, actualTime })
     tx.end()
   })
 })
@@ -402,6 +410,7 @@ test('stream', async (t) => {
   const { agent, undici, HOST, REQUEST_URL } = t.nr
   const { Writable } = require('stream')
   await helper.runInTransaction(agent, async (tx) => {
+    const start = process.hrtime()
     await undici.stream(
       REQUEST_URL,
       {
@@ -416,7 +425,10 @@ test('stream', async (t) => {
         })
       }
     )
+    const actualTime = process.hrtime(start)
     assertSegments(tx.trace, tx.trace.root, [`External/${HOST}/get`], { exact: false })
+    const [segment] = tx.trace.getChildren(tx.trace.root.id)
+    assertSegmentDuration({ segment, actualTime })
     tx.end()
   })
 })

@@ -11,7 +11,7 @@ const assert = require('node:assert')
 const { tspl } = require('@matteo.collina/tspl')
 
 const { removeModules } = require('../../lib/cache-buster')
-const { assertSegments, match } = require('../../lib/custom-assertions')
+const { assertSegmentDuration, assertSegments, match } = require('../../lib/custom-assertions')
 const createOpenAIMockServer = require('../openai/mock-server')
 const helper = require('../../lib/agent_helper')
 const { DESTINATIONS } = require('../../../lib/config/attribute-filter')
@@ -122,6 +122,7 @@ test('should create span on successful CompiledStateGraph.stream', async (t) => 
 
   await helper.runInTransaction(agent, async (tx) => {
     let content = ''
+    const start = process.hrtime()
     try {
       const stream = await langgraphAgent.stream(
         { messages: [{ role: 'user', content: 'You are a scientist.' }] }
@@ -132,10 +133,13 @@ test('should create span on successful CompiledStateGraph.stream', async (t) => 
     } catch (err) {
       assert.fail(err)
     }
+    const actualTime = process.hrtime(start)
     assert.equal(content, '212 degrees Fahrenheit is equal to 100 degrees Celsius.', 'should output correct content')
     assertSegments(tx.trace, tx.trace.root, ['Llm/agent/LangGraph/stream/LangGraphReactAgent'], {
       exact: false
     })
+    const [segment] = tx.trace.getChildren(tx.trace.root.id)
+    assertSegmentDuration({ segment, actualTime })
 
     tx.end()
   })
