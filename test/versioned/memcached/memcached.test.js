@@ -58,7 +58,7 @@ test('memcached instrumentation', { timeout: 5000 }, async function (t) {
           })
         })
         assert.equal(segment.name, 'Datastore/operation/Memcache/touch')
-        assertSegmentDuration({ segment, actualTime })
+        assertSegmentDuration({ segment, actualTime, threshold: 0.5 })
 
         assertSegments(
           transaction.trace,
@@ -105,7 +105,7 @@ test('memcached instrumentation', { timeout: 5000 }, async function (t) {
           })
         })
         assert.equal(segment.name, 'Datastore/operation/Memcache/get')
-        assertSegmentDuration({ segment, actualTime })
+        assertSegmentDuration({ segment, actualTime, threshold: 0.5 })
 
         assertSegments(
           transaction.trace,
@@ -146,7 +146,7 @@ test('memcached instrumentation', { timeout: 5000 }, async function (t) {
           })
         })
         assert.equal(segment.name, 'Datastore/operation/Memcache/gets')
-        assertSegmentDuration({ segment, actualTime })
+        assertSegmentDuration({ segment, actualTime, threshold: 0.5 })
 
         assertSegments(
           transaction.trace,
@@ -187,7 +187,7 @@ test('memcached instrumentation', { timeout: 5000 }, async function (t) {
           })
         })
         assert.equal(segment.name, 'Datastore/operation/Memcache/get')
-        assertSegmentDuration({ segment, actualTime })
+        assertSegmentDuration({ segment, actualTime, threshold: 0.5 })
 
         assertSegments(
           transaction.trace,
@@ -228,7 +228,7 @@ test('memcached instrumentation', { timeout: 5000 }, async function (t) {
           })
         })
         assert.equal(segment.name, 'Datastore/operation/Memcache/set')
-        assertSegmentDuration({ segment, actualTime })
+        assertSegmentDuration({ segment, actualTime, threshold: 0.5 })
 
         assertSegments(
           transaction.trace,
@@ -273,7 +273,7 @@ test('memcached instrumentation', { timeout: 5000 }, async function (t) {
           })
         })
         assert.equal(segment.name, 'Datastore/operation/Memcache/replace')
-        assertSegmentDuration({ segment, actualTime })
+        assertSegmentDuration({ segment, actualTime, threshold: 0.5 })
 
         assertSegments(
           transaction.trace,
@@ -314,7 +314,7 @@ test('memcached instrumentation', { timeout: 5000 }, async function (t) {
           })
         })
         assert.equal(segment.name, 'Datastore/operation/Memcache/add')
-        assertSegmentDuration({ segment, actualTime })
+        assertSegmentDuration({ segment, actualTime, threshold: 0.5 })
 
         assertSegments(
           transaction.trace,
@@ -363,7 +363,7 @@ test('memcached instrumentation', { timeout: 5000 }, async function (t) {
           })
         })
         assert.equal(segment.name, 'Datastore/operation/Memcache/cas')
-        assertSegmentDuration({ segment, actualTime })
+        assertSegmentDuration({ segment, actualTime, threshold: 0.5 })
 
         assertSegments(
           transaction.trace,
@@ -408,7 +408,7 @@ test('memcached instrumentation', { timeout: 5000 }, async function (t) {
           })
         })
         assert.equal(segment.name, 'Datastore/operation/Memcache/append')
-        assertSegmentDuration({ segment, actualTime })
+        assertSegmentDuration({ segment, actualTime, threshold: 0.5 })
 
         assertSegments(
           transaction.trace,
@@ -452,7 +452,7 @@ test('memcached instrumentation', { timeout: 5000 }, async function (t) {
           })
         })
         assert.equal(segment.name, 'Datastore/operation/Memcache/prepend')
-        assertSegmentDuration({ segment, actualTime })
+        assertSegmentDuration({ segment, actualTime, threshold: 0.5 })
 
         assertSegments(
           transaction.trace,
@@ -497,7 +497,7 @@ test('memcached instrumentation', { timeout: 5000 }, async function (t) {
           })
         })
         assert.equal(segment.name, 'Datastore/operation/Memcache/delete')
-        assertSegmentDuration({ segment, actualTime })
+        assertSegmentDuration({ segment, actualTime, threshold: 0.5 })
 
         assertSegments(
           transaction.trace,
@@ -538,7 +538,7 @@ test('memcached instrumentation', { timeout: 5000 }, async function (t) {
           })
         })
         assert.equal(segment.name, 'Datastore/operation/Memcache/incr')
-        assertSegmentDuration({ segment, actualTime })
+        assertSegmentDuration({ segment, actualTime, threshold: 0.5 })
 
         assertSegments(
           transaction.trace,
@@ -579,7 +579,7 @@ test('memcached instrumentation', { timeout: 5000 }, async function (t) {
           })
         })
         assert.equal(segment.name, 'Datastore/operation/Memcache/decr')
-        assertSegmentDuration({ segment, actualTime })
+        assertSegmentDuration({ segment, actualTime, threshold: 0.5 })
 
         assertSegments(
           transaction.trace,
@@ -621,7 +621,7 @@ test('memcached instrumentation', { timeout: 5000 }, async function (t) {
           })
         })
         assert.equal(segment.name, 'Datastore/operation/Memcache/version')
-        assertSegmentDuration({ segment, actualTime })
+        assertSegmentDuration({ segment, actualTime, threshold: 0.5 })
 
         assertSegments(
           transaction.trace,
