@@ -5,8 +5,7 @@
 
 const test = require('node:test')
 const assert = require('node:assert')
-const LlmErrorMessage = require('#agentlib/llm-events/error-message.js')
-const { req } = require('./common')
+const GoogleGenAiLlmErrorMessage = require('#agentlib/llm-events/google-genai/error-message.js')
 
 test('LlmErrorMessage - cause message ok', async () => {
   // Responses are empty when there is an error
@@ -16,8 +15,7 @@ test('LlmErrorMessage - cause message ok', async () => {
     name: 'ServerError',
     message: 'got status: INTERNAL. {"error":{"status":"INTERNAL","code":500,"message":"some error"}}'
   }
-  const summary = { vendor: 'gemini' }
-  const errorMsg = new LlmErrorMessage({ request: req, response: res, cause, summary })
+  const errorMsg = new GoogleGenAiLlmErrorMessage({ response: res, cause })
   const expected = {
     'http.statusCode': 500,
     'error.message': 'got status: INTERNAL. {"error":{"status":"INTERNAL","code":500,"message":"some error"}}',
@@ -47,8 +45,7 @@ test('LlmErrorMessage - cause message invalid json', async () => {
     name: 'ServerError',
     message: '{bad:"json"'
   }
-  const summary = { vendor: 'gemini' }
-  const errorMsg = new LlmErrorMessage({ request: req, response: res, cause, summary })
+  const errorMsg = new GoogleGenAiLlmErrorMessage({ response: res, cause })
   const expected = {
     'http.statusCode': undefined,
     'error.message': '{bad:"json"',
