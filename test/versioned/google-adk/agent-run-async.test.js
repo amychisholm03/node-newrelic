@@ -106,7 +106,7 @@ test('should create span on successful BaseAgent.runAsync', async (t) => {
   await helper.runInTransaction(agent, async (tx) => {
     const results = await consumeGenerator(testAgent.runAsync({}))
     assert.equal(results.length, 1)
-    assertSegments(tx.trace, tx.trace.root, ['Llm/agent/ADK/invoke/span_agent'], {
+    assertSegments(tx.trace, tx.trace.root, ['Llm/agent/ADK/runAsync/span_agent'], {
       exact: false
     })
 
@@ -119,7 +119,6 @@ test('should create LlmAgent event for BaseAgent.runAsync', async (t) => {
 
   const testAgent = createTestAgent(BaseAgent, {
     name: 'event_agent',
-    description: 'A test agent',
     events: [{ id: 'evt-1', author: 'event_agent', content: { parts: [{ text: 'response' }] } }]
   })
 
@@ -137,53 +136,11 @@ test('should create LlmAgent event for BaseAgent.runAsync', async (t) => {
     match(agentEvent, {
       id: /[a-f0-9]{32}/,
       name: 'event_agent',
-      description: 'A test agent',
       span_id: segment.id,
       trace_id: tx.traceId,
       ingest_source: 'Node',
       vendor: 'google_adk'
     })
-
-    tx.end()
-  })
-})
-
-test('should create LlmTool event for function response events', async (t) => {
-  const { agent, BaseAgent } = t.nr
-
-  const toolResponseEvent = {
-    id: 'evt-tool-1',
-    author: 'tool_agent',
-    content: {
-      parts: [{
-        functionResponse: {
-          name: 'get_weather',
-          id: 'call-abc-123',
-          response: { temperature: '72F', unit: 'fahrenheit' }
-        }
-      }]
-    }
-  }
-
-  const testAgent = createTestAgent(BaseAgent, {
-    name: 'tool_agent',
-    events: [toolResponseEvent]
-  })
-
-  await helper.runInTransaction(agent, async (tx) => {
-    await consumeGenerator(testAgent.runAsync({}))
-
-    const events = agent.customEventAggregator.events.toArray()
-    const toolEvents = events.filter((e) => e[0].type === 'LlmTool')
-    assert.equal(toolEvents.length, 1, 'should have exactly 1 LlmTool event')
-
-    const [[{ type }, toolEvent]] = toolEvents
-    assert.equal(type, 'LlmTool')
-    assert.equal(toolEvent.name, 'get_weather')
-    assert.equal(toolEvent.vendor, 'google_adk')
-    assert.equal(toolEvent.run_id, 'call-abc-123')
-    assert.equal(toolEvent.output, '{"temperature":"72F","unit":"fahrenheit"}')
-    assert.equal(toolEvent.agent_name, 'tool_agent')
 
     tx.end()
   })

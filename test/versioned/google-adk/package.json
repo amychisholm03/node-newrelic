@@ -21,7 +21,8 @@
         "@google/adk": ">=0.1.0"
       },
       "files": [
-        "agent-run-async.test.js"
+        "agent-run-async.test.js",
+        "tool-run-async.test.js"
       ]
     }
   ]
