@@ -14,6 +14,9 @@ const hashes = require('./lib/util/hashes')
 const properties = require('./lib/util/properties')
 const stringify = require('json-stringify-safe')
 const shimmer = require('./lib/shimmer')
+const createSegmentInContext = require('./lib/context-manager/create-segment.js')
+const Transaction = require('./lib/transaction/index.js')
+const { describeInvalidInstrumentation } = require('./lib/subscribers/validate-instrumentation.js')
 const isValidType = require('./lib/util/attribute-types')
 const TransactionShim = require('./lib/shim/transaction-shim')
 const TransactionHandle = require('./lib/transaction/handle')
@@ -1516,8 +1519,8 @@ API.prototype.instrumentMessages = function instrumentMessages(moduleName, onReq
  */
 API.prototype.instrumentLoadedModule = function instrumentLoadedModule(moduleName, module) {
   const warningMsg = 'newrelic.instrumentLoadedModule is deprecated and will be removed in v15. ' +
-      'Load the agent via `node -r newrelic` (or NODE_OPTIONS=\'-r newrelic\') ' +
-      'so it is active before user modules resolve.'
+    'Load the agent via `node -r newrelic` (or NODE_OPTIONS=\'-r newrelic\') ' +
+    'so it is active before user modules resolve.'
   logger.warn(warningMsg)
   process.emitWarning(warningMsg, { type: 'DeprecationWarning' })
 
@@ -1536,6 +1539,217 @@ API.prototype.instrumentLoadedModule = function instrumentLoadedModule(moduleNam
   }
 
   return false
+}
+
+/**
+ * Creates a generic Subscriber for the given module.
+ *
+ * @example
+ * // instrumentation.js, load with `node -r ./instrumentation index.js`
+  const newrelic = require('newrelic')
+  // Define the subscriber config: what to instrument, when to fire, and what to do - all in
+  // one entry per target function, so there's nothing to keep in sync by array index.
+  const config = {
+    instrumentations: [
+      {
+        module: { name: 'my-lib', versionRange: '>=1.0.0' },
+        functionQuery: { methodName: 'foo', kind: 'Sync' },
+        events: ['end'],
+        handlers: {
+          // createSegment takes the context explicitly and returns the new
+          // context, which is what `handler` is expected to return.
+          handler: (data, ctx) => {
+            return newrelic.createSegment(ctx, { name: 'foo' })
+          },
+          end: (data) => {
+            console.log('Instrumentation triggered for foo');
+            // Add your custom logic here, what to do when `foo` ends?
+          }
+        }
+      }
+    ]
+  };
+
+  // Register the subscription
+  newrelic.subscribeTo('my-lib', config);
+ *
+ * @param {string} moduleName The module name to require to load the module.
+ * @param {object} config The subscriber config, see lib/subscribers/README.md.
+ * @param {Array<object>} config.instrumentations One entry per target function. Each entry needs
+ * `module`/`functionQuery` (what to instrument), `events` (an array of events to listen for on
+ * that function, e.g. `['end']` - allowed values are 'end', 'asyncEnd', 'asyncStart', and less
+ * commonly used, 'start'), and `handlers` (an object with a function per listed event, plus
+ * optionally `handler`, to run when those events fire).
+ */
+API.prototype.subscribeTo = function subscribeTo(moduleName, config) {
+  // Following the same metric creation as instrument* APIs
+  // TODO: Add new metric names to Angler
+  const metric = this.agent.metrics.getOrCreateMetric(
+    NAMES.SUPPORTABILITY.API + '/subscribeTo'
+  )
+  metric.incrementCallCount()
+
+  const instrumentations = config?.instrumentations
+  if (typeof moduleName !== 'string' || !Array.isArray(instrumentations)) {
+    logger.warn(
+      'subscribeTo requires a moduleName string and a config.instrumentations array. Not subscribing.'
+    )
+    return
+  }
+
+  for (let i = 0; i < instrumentations.length; i++) {
+    const reason = describeInvalidInstrumentation(instrumentations[i], i)
+    if (reason) {
+      logger.warn(`subscribeTo('${moduleName}'): ${reason}. Not subscribing.`)
+      return
+    }
+  }
+
+  shimmer.setupCustomSubscriber(this.agent, moduleName, config)
+}
+
+/**
+ * Creates a segment and enters it into the given context, returning the new context.
+ *
+ * Unlike {@link API#startSegment}, this does not take a callback to wrap - it's meant for use
+ * inside a `subscribeTo` handler, where the diagnostics channel itself expects your handler to
+ * return the context that should be propagated, rather than a value produced by calling a
+ * callback. If you do have a function to run inside the new segment right away (e.g. a callback
+ * or listener your `subscribeTo` handler wrapped), pass it as `opts.handler` instead of making a
+ * separate call - the new segment's context is only made active for the duration of that call.
+ *
+ * @example
+ *  const handlers = [
+ *    {
+ *      handler: (data, ctx) => {
+ *        return newrelic.createSegment(ctx, { name: 'myCustomSegment' })
+ *      }
+ *    }
+ *  ]
+ * @param {object} ctx The context passed into your `subscribeTo` handler.
+ * @param {object} opts Options describing the segment to create.
+ * @param {string} opts.name The name to give the new segment.
+ * @param {Function} [opts.recorder] Optional recorder function for the segment.
+ * @param {object} [opts.attributes] Optional key/value attributes to add to the segment.
+ * @param {Function} [opts.handler] If given, runs `handler` with the new segment's context made
+ * active, instead of just returning the new context.
+ * @param {*} [opts.thisArg] The `this` value `opts.handler` should be called with.
+ * @param {Array} [opts.args] Arguments to call `opts.handler` with.
+ * @param {boolean} [opts.full] If true (the default), starts/touches the new segment around the
+ * `opts.handler` call, and binds a returned promise so the segment stays open until it settles.
+ * Only relevant when `opts.handler` is given.
+ * @returns {object|*} The new context with the segment entered, or the original context if the
+ * segment could not be created (e.g. no active transaction). If `opts.handler` is given, returns
+ * whatever `opts.handler` returns instead.
+ */
+API.prototype.createSegment = function createSegment(ctx, opts) {
+  const metric = this.agent.metrics.getOrCreateMetric(
+    NAMES.SUPPORTABILITY.API + '/createSegment'
+  )
+  metric.incrementCallCount()
+
+  const { name, recorder, attributes, handler, thisArg, args, full = true } = opts || {}
+  if (!name) {
+    logger.warn('createSegment requires a name, not creating a segment.')
+    return ctx
+  }
+
+  const newCtx = createSegmentInContext({ agent: this.agent, ctx, name, recorder, attributes })
+  if (newCtx === ctx) {
+    logger.debug(
+      'createSegment(%j) could not create a segment, returning unchanged context.',
+      name
+    )
+  }
+
+  if (typeof handler === 'function') {
+    return this.agent.tracer.runInContext({ handler, context: newCtx, full, thisArg, args })
+  }
+
+  return newCtx
+}
+
+/**
+ * Creates a new transaction (and its base segment), enters it into the given context, and
+ * returns the new context. Use this when a single event should be tracked as its own
+ * transaction, rather than as a segment within whatever transaction is already active - e.g. a
+ * message being consumed, where each message should get its own transaction.
+ *
+ * If you have a function to run inside the new transaction right away (typically some callback
+ * or listener your `subscribeTo` handler wrapped), pass it as `opts.handler` - the transaction is
+ * ended automatically once `opts.handler` returns (or, if it returns a promise, once that
+ * promise settles). Without `opts.handler`, this only creates and enters the transaction; you're
+ * responsible for ending it yourself via the returned context's `.transaction`.
+ *
+ * @example
+ *  const handlers = [
+ *    {
+ *      handler: (data, ctx) => {
+ *        const originalListener = data.arguments[0]
+ *        data.arguments[0] = function wrapped(...args) {
+ *          return newrelic.createTransaction(ctx, {
+ *            type: 'bg',
+ *            name: 'myTransaction',
+ *            handler: originalListener,
+ *            thisArg: this,
+ *            args
+ *          })
+ *        }
+ *        return ctx
+ *      }
+ *    }
+ *  ]
+ * @param {object} ctx A context, e.g. the one passed into your `subscribeTo` handler.
+ * @param {object} opts Options describing the transaction to create.
+ * @param {string} [opts.type] The transaction type, e.g. 'bg', 'web', 'message'. Defaults to 'bg'.
+ * @param {string} [opts.name] Partial name to give the transaction.
+ * @param {Function} [opts.recorder] Optional recorder for the transaction's base segment.
+ * @param {Function} [opts.handler] If given, runs `handler` with the new transaction's context
+ * made active, and ends the transaction once it (or the promise it returns) settles.
+ * @param {*} [opts.thisArg] The `this` value `opts.handler` should be called with.
+ * @param {Array} [opts.args] Arguments to call `opts.handler` with.
+ * @param {boolean} [opts.full] If true (the default), starts/touches the base segment around the
+ * `opts.handler` call. Only relevant when `opts.handler` is given.
+ * @returns {object|*} The new context with the transaction and its base segment entered. If
+ * `opts.handler` is given, returns whatever `opts.handler` returns instead.
+ */
+API.prototype.createTransaction = function createTransaction(ctx, opts) {
+  const metric = this.agent.metrics.getOrCreateMetric(
+    NAMES.SUPPORTABILITY.API + '/createTransaction'
+  )
+  metric.incrementCallCount()
+
+  if (typeof ctx?.enterTransaction !== 'function') {
+    logger.warn('createTransaction requires a valid context. Not creating a transaction.')
+    return ctx
+  }
+
+  const { type = 'bg', name, recorder, handler, thisArg, args, full = true } = opts || {}
+  const tx = new Transaction(this.agent)
+  tx.type = type
+  if (name) {
+    tx.setPartialName(name)
+  }
+
+  const txCtx = ctx.enterTransaction(tx)
+  const newCtx = createSegmentInContext({
+    agent: this.agent,
+    ctx: txCtx,
+    name: tx.getFullName(),
+    recorder
+  })
+  tx.baseSegment = newCtx.segment
+
+  if (typeof handler === 'function') {
+    const result = this.agent.tracer.runInContext({ handler, context: newCtx, full, thisArg, args })
+    if (typeof result?.then === 'function') {
+      return result.finally(() => tx.end())
+    }
+    tx.end()
+    return result
+  }
+
+  return newCtx
 }
 
 /**
@@ -1652,7 +1866,7 @@ API.prototype.shutdown = function shutdown(options, cb) {
     options = {}
   } else if (typeof callback !== 'function') {
     // shutdown([options])
-    callback = () => {}
+    callback = () => { }
   }
   if (!options) {
     // shutdown(null, cb)
@@ -1827,7 +2041,7 @@ function _filterAttributes(attributes, name) {
     if (!isValidType(attributes[attributeKey])) {
       logger.info(
         `Omitting attribute ${attributeKey} from ${name} call, type must ` +
-          'be boolean, number, or string'
+        'be boolean, number, or string'
       )
       continue
     }
