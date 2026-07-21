@@ -862,6 +862,94 @@ test('Shimmer subscriber setup/teardown', async (t) => {
   })
 })
 
+test('Shimmer custom subscriber setup', async (t) => {
+  t.beforeEach((ctx) => {
+    const patchStub = sinon.stub()
+    const unpatchStub = sinon.stub()
+    let modulePatchOpts = null
+
+    class FakeModulePatch {
+      constructor(opts) {
+        modulePatchOpts = opts
+      }
+
+      patch(...args) {
+        return patchStub(...args)
+      }
+
+      unpatch(...args) {
+        return unpatchStub(...args)
+      }
+    }
+
+    const shimmer = proxyquire('../../lib/shimmer', {
+      '@apm-js-collab/tracing-hooks': FakeModulePatch
+    })
+    const agent = helper.loadMockedAgent({}, true)
+
+    ctx.nr = {
+      agent,
+      shimmer,
+      patchStub,
+      unpatchStub,
+      getModulePatchOpts: () => modulePatchOpts
+    }
+  })
+
+  t.afterEach((ctx) => {
+    const { agent, shimmer } = ctx.nr
+    helper.unloadAgent(agent, shimmer)
+  })
+
+  function getTestConfig() {
+    return {
+      config: {
+        instrumentations: [
+          {
+            module: { name: 'my-lib', versionRange: '>=1.0.0', filePath: 'index.js' },
+            functionQuery: { methodName: 'foo', kind: 'Sync' }
+          }
+        ]
+      },
+      events: [['end']],
+      handlers: [{ end: () => {} }]
+    }
+  }
+
+  await t.test('should create and enable a subscriber for each instrumentation entry', (t) => {
+    const { agent, shimmer } = t.nr
+    const { config, events, handlers } = getTestConfig()
+
+    shimmer.setupCustomSubscriber(agent, 'my-lib', config, events, handlers)
+
+    const subscriber = shimmer._subscribers['orchestrion:my-lib:nr_custom_my-lib_foo']
+    assert.ok(subscriber, 'should have created a subscriber for the custom instrumentation')
+    assert.ok(subscriber.subscriptions, 'should have subscribed to the generated channel')
+  })
+
+  await t.test('should not touch the real ModulePatch, only the stubbed one', (t) => {
+    const { agent, shimmer, patchStub, getModulePatchOpts } = t.nr
+    const { config, events, handlers } = getTestConfig()
+
+    shimmer.setupCustomSubscriber(agent, 'my-lib', config, events, handlers)
+
+    assert.ok(patchStub.calledOnce, 'should have patched using the stubbed ModulePatch')
+    const { instrumentations } = getModulePatchOpts()
+    assert.equal(instrumentations.length, 1)
+    assert.equal(instrumentations[0].channelName, 'nr_custom_my-lib_foo')
+    assert.equal(instrumentations[0].module.name, 'my-lib')
+  })
+
+  await t.test('should track the stubbed ModulePatch for later teardown', (t) => {
+    const { agent, shimmer } = t.nr
+    const { config, events, handlers } = getTestConfig()
+
+    shimmer.setupCustomSubscriber(agent, 'my-lib', config, events, handlers)
+
+    assert.equal(shimmer._customModulePatches.length, 1)
+  })
+})
+
 function clearCachedModules(modules) {
   modules.forEach((moduleName) => {
     try {

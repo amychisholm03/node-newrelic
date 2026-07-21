@@ -1516,8 +1516,8 @@ API.prototype.instrumentMessages = function instrumentMessages(moduleName, onReq
  */
 API.prototype.instrumentLoadedModule = function instrumentLoadedModule(moduleName, module) {
   const warningMsg = 'newrelic.instrumentLoadedModule is deprecated and will be removed in v15. ' +
-      'Load the agent via `node -r newrelic` (or NODE_OPTIONS=\'-r newrelic\') ' +
-      'so it is active before user modules resolve.'
+    'Load the agent via `node -r newrelic` (or NODE_OPTIONS=\'-r newrelic\') ' +
+    'so it is active before user modules resolve.'
   logger.warn(warningMsg)
   process.emitWarning(warningMsg, { type: 'DeprecationWarning' })
 
@@ -1536,6 +1536,66 @@ API.prototype.instrumentLoadedModule = function instrumentLoadedModule(moduleNam
   }
 
   return false
+}
+
+/**
+ * Creates a generic Subscriber for the given module.
+ *
+ * @example
+ * // instrumentation.js, load with `node -r ./instrumentation index.js`
+  const newrelic = require('newrelic')
+  // 1. Define the subscriber config (what to instrument)
+  const config = {
+    instrumentations: [
+      {
+        module: { name: 'my-lib', versionRange: '>=1.0.0' },
+        functionQuery: { methodName: 'foo', kind: 'Sync' }
+      }
+    ]
+  };
+
+  // 2. Define events (when to trigger)
+  // index 0 here maps to index 0 in config.instrumentations
+  const events = [['end']];
+
+  // 3. Define handlers (the logic to run)
+  // index 0 here maps to index 0 in config.instrumentations
+  const handlers = [
+    {
+      end: (data) => {
+        console.log('Instrumentation triggered for scheduleJob');
+        // Add your custom logic here, what to do when `foo` ends?
+      }
+    }
+  ];
+
+  // 4. Register the subscription
+  newrelic.subscribeTo({
+    moduleName: 'my-lib',
+    config,
+    events,
+    handlers
+  });
+ *
+ * @param {string} moduleName The module name to require to load the module.
+ * @param {object} config The subscriber config, see lib/subscribers/README.md.
+ * TODO: make subscriber config a class?
+ * @param {object} events An index-based array that maps 1-to-1 to the entries in your
+ * `config.instrumentations` array. Each entry contains the events (e.g. `['end']`) to listen
+ * for that specific target function. Allowed events are 'end', 'asyncEnd', 'asyncStart', and
+ * less commonly used, 'start'.
+ * @param {object} handlers An index-based array that maps 1-to-1 to your `config.instrumentations`
+ * array. Each object contains the functions (e.g. handler, end) to execute when your events are
+ * triggered.
+ */
+API.prototype.subscribeTo = function subscribeTo(moduleName, config, events, handlers) {
+  // Following the same metric creation as instrument* APIs
+  // TODO: Add new metric names to Angler
+  const metric = this.agent.metrics.getOrCreateMetric(
+    NAMES.SUPPORTABILITY.API + '/subscribeTo'
+  )
+  metric.incrementCallCount()
+  shimmer.setupCustomSubscriber(this.agent, moduleName, config, events, handlers)
 }
 
 /**
@@ -1652,7 +1712,7 @@ API.prototype.shutdown = function shutdown(options, cb) {
     options = {}
   } else if (typeof callback !== 'function') {
     // shutdown([options])
-    callback = () => {}
+    callback = () => { }
   }
   if (!options) {
     // shutdown(null, cb)
@@ -1827,7 +1887,7 @@ function _filterAttributes(attributes, name) {
     if (!isValidType(attributes[attributeKey])) {
       logger.info(
         `Omitting attribute ${attributeKey} from ${name} call, type must ` +
-          'be boolean, number, or string'
+        'be boolean, number, or string'
       )
       continue
     }
