@@ -11,8 +11,8 @@ supported by the agent.
 
 | Package name | Minimum supported version | Latest published version | Introduced in* |
 | --- | --- | --- | --- |
-| `@anthropic-ai/sdk` | 0.33.0 | 0.112.5 | 13.19.0 |
-| `@apollo/gateway` | 2.3.0 | 2.14.2 | 14.0.0 |
+| `@anthropic-ai/sdk` | 0.33.0 | 0.113.0 | 13.19.0 |
+| `@apollo/gateway` | 2.3.0 | 2.14.3 | 14.0.0 |
 | `@apollo/server` | 4.0.0 | 5.5.1 | 14.0.0 |
 | `@aws-sdk/client-bedrock-runtime` | 3.377.0 | 3.1092.0 | 11.13.0 |
 | `@aws-sdk/client-dynamodb` | 3.377.0 | 3.1092.0 | 8.7.1 |
