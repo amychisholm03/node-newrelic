@@ -14,6 +14,7 @@ const hashes = require('./lib/util/hashes')
 const properties = require('./lib/util/properties')
 const stringify = require('json-stringify-safe')
 const shimmer = require('./lib/shimmer')
+const Subscription = require('./lib/subscribers/subscription.js')
 const isValidType = require('./lib/util/attribute-types')
 const TransactionShim = require('./lib/shim/transaction-shim')
 const TransactionHandle = require('./lib/transaction/handle')
@@ -1536,6 +1537,41 @@ API.prototype.instrumentLoadedModule = function instrumentLoadedModule(moduleNam
   }
 
   return false
+}
+
+/**
+ * Creates a {@link Subscription} for registering custom instrumentation on a module, one
+ * function at a time.
+ *
+ * IMPORTANT: `.on(event, handler)` calls `handler` with `this` set to the subscriber instance
+ * (e.g. so `this.createSegment(...)` works). Use `function`, not an arrow function, for any
+ * handler that needs `this` - arrow functions ignore it.
+ *
+ * @example
+ *  const subscription = newrelic.createSubscription('my-lib')
+ *
+ *  const target = subscription.instrument({
+ *    module: { name: 'my-lib', versionRange: '>=1.0.0', filePath: 'index.js' },
+ *    functionQuery: { methodName: 'foo', kind: 'Sync' }
+ *  })
+ *
+ *  target
+ *    // `function`, not `() =>`, because this needs `this.createSegment`
+ *    .on('start', function (data, ctx) { return this.createSegment({ name: 'foo', ctx }) })
+ *    .on('end', (data) => console.log('foo done'))
+ *
+ *  subscription.register()
+ * @param {string} moduleName The module name to require to load the module.
+ * @returns {Subscription} A new, empty subscription - call `.instrument()` on it to declare
+ * functions to hook, then `.register()` once all of them are declared.
+ */
+API.prototype.createSubscription = function createSubscription(moduleName) {
+  const metric = this.agent.metrics.getOrCreateMetric(
+    NAMES.SUPPORTABILITY.API + '/createSubscription'
+  )
+  metric.incrementCallCount()
+
+  return new Subscription(this.agent, moduleName)
 }
 
 /**
