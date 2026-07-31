@@ -1547,6 +1547,10 @@ API.prototype.instrumentLoadedModule = function instrumentLoadedModule(moduleNam
  * (e.g. so `this.createSegment(...)` works). Use `function`, not an arrow function, for any
  * handler that needs `this` - arrow functions ignore it.
  *
+ * IMPORTANT: for the `'handler'` event specifically, whatever you return becomes the active
+ * context for the rest of the call - don't forget to `return` it (or the original `ctx`, if
+ * you're not creating a new one).
+ *
  * @example
  *  const subscription = newrelic.createSubscription('my-lib')
  *
@@ -1557,7 +1561,7 @@ API.prototype.instrumentLoadedModule = function instrumentLoadedModule(moduleNam
  *
  *  target
  *    // `function`, not `() =>`, because this needs `this.createSegment`
- *    .on('start', function (data, ctx) { return this.createSegment({ name: 'foo', ctx }) })
+ *    .on('handler', function (data, ctx) { return this.createSegment({ name: 'foo', ctx }) })
  *    .on('end', (data) => console.log('foo done'))
  *
  *  subscription.register()

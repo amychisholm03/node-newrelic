@@ -123,10 +123,10 @@ test('InstrumentationTarget#on', async (t) => {
     assert.throws(() => target.on('edn', () => {}), /unknown event 'edn'/)
   })
 
-  await t.test('should not throw for "start", assigning to handlers.handler', (t) => {
+  await t.test('should not throw for "handler", assigning to handlers.handler', (t) => {
     const { target } = t.nr
     const handler = () => {}
-    target.on('start', handler)
+    target.on('handler', handler)
     assert.equal(target.handlers.handler, handler)
     assert.deepEqual(target.events, [])
   })
@@ -183,14 +183,14 @@ test('Subscription#register', async (t) => {
     assert.equal(Object.keys(subscription._subscribers).length, 2)
   })
 
-  await t.test('the "start" handler fires and can return a new context', (t) => {
+  await t.test('the "handler" event fires and can return a new context', (t) => {
     const { agent } = t.nr
     const Subscription = loadSubscription({ patchStub: sinon.stub() })
 
     const subscription = new Subscription(agent, 'my-lib')
     let sawData
     subscription.instrument({ module: VALID_MODULE, functionQuery: VALID_FUNCTION_QUERY })
-      .on('start', (data, ctx) => {
+      .on('handler', (data, ctx) => {
         sawData = data
         return ctx
       })
@@ -202,6 +202,22 @@ test('Subscription#register', async (t) => {
 
     assert.equal(result, fakeCtx)
     assert.deepEqual(sawData, { some: 'data' })
+  })
+
+  await t.test('falls back to the original ctx if the "handler" event forgets to return one', (t) => {
+    const { agent } = t.nr
+    const Subscription = loadSubscription({ patchStub: sinon.stub() })
+
+    const subscription = new Subscription(agent, 'my-lib')
+    subscription.instrument({ module: VALID_MODULE, functionQuery: VALID_FUNCTION_QUERY })
+      .on('handler', () => { /* forgot to return anything */ })
+    subscription.register()
+
+    const [subscriber] = Object.values(subscription._subscribers)
+    const fakeCtx = { fake: true }
+    const result = subscriber.handler({}, fakeCtx)
+
+    assert.equal(result, fakeCtx)
   })
 
   await t.test('a listed event handler runs and touches the active segment', (t) => {
