@@ -1541,28 +1541,25 @@ API.prototype.instrumentLoadedModule = function instrumentLoadedModule(moduleNam
 
 /**
  * Creates a {@link Subscription} for registering custom instrumentation on a module, one
- * function at a time.
- *
- * IMPORTANT: `.on(event, handler)` calls `handler` with `this` set to the subscriber instance
- * (e.g. so `this.createSegment(...)` works). Use `function`, not an arrow function, for any
- * handler that needs `this` - arrow functions ignore it.
- *
- * IMPORTANT: for the `'handler'` event specifically, whatever you return becomes the active
- * context for the rest of the call - don't forget to `return` it (or the original `ctx`, if
- * you're not creating a new one).
+ * function at a time. `.instrument()` returns a `Subscriber` instance - pass it a
+ * `{handler, end, asyncEnd, asyncStart, error}` object to configure it in (`Subscriber.events` is
+ * derived from whichever of those keys you give, so there's no separate list to keep in sync),
+ * or omit that and configure the returned instance directly - set `.events` yourself and assign
+ * `.handler`/`.end`/`.asyncEnd`/`.asyncStart`/`.error`s.
  *
  * @example
  *  const subscription = newrelic.createSubscription('my-lib')
  *
- *  const target = subscription.instrument({
- *    module: { name: 'my-lib', versionRange: '>=1.0.0', filePath: 'index.js' },
- *    functionQuery: { methodName: 'foo', kind: 'Sync' }
- *  })
- *
- *  target
- *    // `function`, not `() =>`, because this needs `this.createSegment`
- *    .on('handler', function (data, ctx) { return this.createSegment({ name: 'foo', ctx }) })
- *    .on('end', (data) => console.log('foo done'))
+ *  subscription.instrument(
+ *    {
+ *      module: { name: 'my-lib', versionRange: '>=1.0.0', filePath: 'index.js' },
+ *      functionQuery: { methodName: 'foo', kind: 'Sync' }
+ *    },
+ *    {
+ *      handler: function (data, ctx) { return this.createSegment({ name: 'foo', ctx }) },
+ *      end: (data) => console.log('foo done')
+ *    }
+ *  )
  *
  *  subscription.register()
  * @param {string} moduleName The module name to require to load the module.

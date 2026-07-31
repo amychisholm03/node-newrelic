@@ -52,7 +52,12 @@ test('Subscription constructor', async (t) => {
 test('Subscription#instrument', async (t) => {
   t.beforeEach((ctx) => {
     const Subscription = loadSubscription()
-    ctx.nr = { subscription: new Subscription({}, 'my-lib') }
+    const agent = helper.loadMockedAgent()
+    ctx.nr = { agent, subscription: new Subscription(agent, 'my-lib') }
+  })
+
+  t.afterEach((ctx) => {
+    helper.unloadAgent(ctx.nr.agent)
   })
 
   await t.test('should throw when module.name is missing', (t) => {
@@ -87,7 +92,7 @@ test('Subscription#instrument', async (t) => {
     )
   })
 
-  await t.test('should throw for an invalid kind (regression: the real "Ssync" typo)', (t) => {
+  await t.test('should throw for an invalid kind', (t) => {
     const { subscription } = t.nr
     assert.throws(
       () => subscription.instrument({ module: VALID_MODULE, functionQuery: { methodName: 'foo', kind: 'Ssync' } }),
@@ -95,51 +100,86 @@ test('Subscription#instrument', async (t) => {
     )
   })
 
-  await t.test('should succeed and return a chainable target for valid input', (t) => {
+  await t.test('should succeed and return a configurable Subscriber instance for valid input', (t) => {
     const { subscription } = t.nr
-    const target = subscription.instrument({ module: VALID_MODULE, functionQuery: VALID_FUNCTION_QUERY })
-    assert.ok(target)
-    assert.equal(typeof target.on, 'function')
-    assert.deepEqual(target.events, [])
-    assert.deepEqual(target.handlers, {})
+    const subscriber = subscription.instrument({ module: VALID_MODULE, functionQuery: VALID_FUNCTION_QUERY })
+    assert.ok(subscriber)
+    assert.deepEqual(subscriber.events, [])
+    assert.equal(typeof subscriber.handler, 'function')
+    assert.equal(typeof subscriber.end, 'function')
+    assert.equal(subscriber.packageName, 'my-lib')
+    assert.equal(subscriber.channelName, 'nr_custom_my-lib_foo')
   })
 })
 
-test('InstrumentationTarget#on', async (t) => {
+test('Subscription#instrument with a handlers object', async (t) => {
   t.beforeEach((ctx) => {
     const Subscription = loadSubscription()
-    const subscription = new Subscription({}, 'my-lib')
-    const target = subscription.instrument({ module: VALID_MODULE, functionQuery: VALID_FUNCTION_QUERY })
-    ctx.nr = { target }
+    const agent = helper.loadMockedAgent()
+    ctx.nr = { agent, subscription: new Subscription(agent, 'my-lib') }
   })
 
-  await t.test('should throw when handler is not a function', (t) => {
-    const { target } = t.nr
-    assert.throws(() => target.on('end', 'not-a-function'), /handler for 'end' must be a function/)
+  t.afterEach((ctx) => {
+    helper.unloadAgent(ctx.nr.agent)
   })
 
-  await t.test('should throw for an unknown event (regression: the "edn" typo)', (t) => {
-    const { target } = t.nr
-    assert.throws(() => target.on('edn', () => {}), /unknown event 'edn'/)
+  await t.test('derives .events from the given keys, excluding "handler"', (t) => {
+    const { subscription } = t.nr
+    const subscriber = subscription.instrument(
+      { module: VALID_MODULE, functionQuery: VALID_FUNCTION_QUERY },
+      { handler: () => {}, end: () => {}, asyncEnd: () => {} }
+    )
+    assert.deepEqual(subscriber.events.slice().sort(), ['asyncEnd', 'end'])
   })
 
-  await t.test('should not throw for "handler", assigning to handlers.handler', (t) => {
-    const { target } = t.nr
-    const handler = () => {}
-    target.on('handler', handler)
-    assert.equal(target.handlers.handler, handler)
-    assert.deepEqual(target.events, [])
+  await t.test('throws immediately for an unknown event name', (t) => {
+    const { subscription } = t.nr
+    assert.throws(
+      () => subscription.instrument({ module: VALID_MODULE, functionQuery: VALID_FUNCTION_QUERY }, { edn: () => {} }),
+      /unknown event 'edn'/
+    )
   })
 
-  await t.test('should return `this` for chaining, accumulating events/handlers', (t) => {
-    const { target } = t.nr
-    const endHandler = () => {}
-    const asyncEndHandler = () => {}
-    const result = target.on('end', endHandler).on('asyncEnd', asyncEndHandler)
-    assert.equal(result, target)
-    assert.deepEqual(target.events, ['end', 'asyncEnd'])
-    assert.equal(target.handlers.end, endHandler)
-    assert.equal(target.handlers.asyncEnd, asyncEndHandler)
+  await t.test('throws immediately when a handler value is not a function', (t) => {
+    const { subscription } = t.nr
+    assert.throws(
+      () => subscription.instrument({ module: VALID_MODULE, functionQuery: VALID_FUNCTION_QUERY }, { end: 'not-a-function' }),
+      /handler for 'end' must be a function/
+    )
+  })
+
+  await t.test('the assigned handler is called with `this` set to the subscriber and falls back to ctx', (t) => {
+    const { subscription } = t.nr
+    let sawThis
+    const subscriber = subscription.instrument(
+      { module: VALID_MODULE, functionQuery: VALID_FUNCTION_QUERY },
+      { handler: function () { sawThis = this } }
+    )
+    const fakeCtx = { fake: true }
+    const result = subscriber.handler({}, fakeCtx)
+    assert.equal(sawThis, subscriber)
+    assert.equal(result, fakeCtx, 'falls back to ctx when the user handler returns nothing')
+  })
+
+  await t.test('an assigned event handler touches the segment automatically', (t) => {
+    const { agent, subscription } = t.nr
+    let handlerCalled = false
+    const subscriber = subscription.instrument(
+      { module: VALID_MODULE, functionQuery: VALID_FUNCTION_QUERY },
+      { end: () => { handlerCalled = true } }
+    )
+
+    helper.runInTransaction(agent, (tx) => {
+      const segment = tx.trace.root
+      const touchSpy = sinon.spy(segment, 'touch')
+      sinon.stub(agent.tracer, 'getContext').returns({ segment })
+
+      subscriber.end({})
+
+      assert.ok(handlerCalled)
+      assert.ok(touchSpy.called, 'the shortcut auto-touches, unlike a raw assignment')
+      agent.tracer.getContext.restore()
+    })
   })
 })
 
@@ -159,8 +199,9 @@ test('Subscription#register', async (t) => {
     const Subscription = loadSubscription({ patchStub, captureOpts: (opts) => { capturedOpts = opts } })
 
     const subscription = new Subscription(agent, 'my-lib')
-    subscription.instrument({ module: VALID_MODULE, functionQuery: VALID_FUNCTION_QUERY })
-      .on('end', () => {})
+    const subscriber = subscription.instrument({ module: VALID_MODULE, functionQuery: VALID_FUNCTION_QUERY })
+    subscriber.events = ['end']
+    subscriber.end = () => {}
 
     subscription.register()
 
@@ -175,28 +216,27 @@ test('Subscription#register', async (t) => {
     const Subscription = loadSubscription({ patchStub: sinon.stub() })
 
     const subscription = new Subscription(agent, 'my-lib')
-    subscription.instrument({ module: VALID_MODULE, functionQuery: { methodName: 'foo', kind: 'Sync' } }).on('end', () => {})
-    subscription.instrument({ module: VALID_MODULE, functionQuery: { methodName: 'bar', kind: 'Sync' } }).on('end', () => {})
+    subscription.instrument({ module: VALID_MODULE, functionQuery: { methodName: 'foo', kind: 'Sync' } })
+    subscription.instrument({ module: VALID_MODULE, functionQuery: { methodName: 'bar', kind: 'Sync' } })
 
     subscription.register()
 
     assert.equal(Object.keys(subscription._subscribers).length, 2)
   })
 
-  await t.test('the "handler" event fires and can return a new context', (t) => {
+  await t.test('an assigned handler fires and can return a new context', (t) => {
     const { agent } = t.nr
     const Subscription = loadSubscription({ patchStub: sinon.stub() })
 
     const subscription = new Subscription(agent, 'my-lib')
+    const subscriber = subscription.instrument({ module: VALID_MODULE, functionQuery: VALID_FUNCTION_QUERY })
     let sawData
-    subscription.instrument({ module: VALID_MODULE, functionQuery: VALID_FUNCTION_QUERY })
-      .on('handler', (data, ctx) => {
-        sawData = data
-        return ctx
-      })
+    subscriber.handler = function (data, ctx) {
+      sawData = data
+      return ctx
+    }
     subscription.register()
 
-    const [subscriber] = Object.values(subscription._subscribers)
     const fakeCtx = { fake: true }
     const result = subscriber.handler({ some: 'data' }, fakeCtx)
 
@@ -204,33 +244,30 @@ test('Subscription#register', async (t) => {
     assert.deepEqual(sawData, { some: 'data' })
   })
 
-  await t.test('falls back to the original ctx if the "handler" event forgets to return one', (t) => {
+  await t.test('an assigned event method runs when its event is listed', (t) => {
     const { agent } = t.nr
     const Subscription = loadSubscription({ patchStub: sinon.stub() })
 
     const subscription = new Subscription(agent, 'my-lib')
-    subscription.instrument({ module: VALID_MODULE, functionQuery: VALID_FUNCTION_QUERY })
-      .on('handler', () => { /* forgot to return anything */ })
+    const subscriber = subscription.instrument({ module: VALID_MODULE, functionQuery: VALID_FUNCTION_QUERY })
+    let handlerCalled = false
+    subscriber.events = ['end']
+    subscriber.end = () => { handlerCalled = true }
     subscription.register()
 
-    const [subscriber] = Object.values(subscription._subscribers)
-    const fakeCtx = { fake: true }
-    const result = subscriber.handler({}, fakeCtx)
+    subscriber.end({})
 
-    assert.equal(result, fakeCtx)
+    assert.ok(handlerCalled)
   })
 
-  await t.test('a listed event handler runs and touches the active segment', (t) => {
+  await t.test('the inherited default end() still touches the segment when not overridden', (t) => {
     const { agent } = t.nr
     const Subscription = loadSubscription({ patchStub: sinon.stub() })
 
     const subscription = new Subscription(agent, 'my-lib')
-    let handlerCalled = false
-    subscription.instrument({ module: VALID_MODULE, functionQuery: VALID_FUNCTION_QUERY })
-      .on('end', () => { handlerCalled = true })
+    const subscriber = subscription.instrument({ module: VALID_MODULE, functionQuery: VALID_FUNCTION_QUERY })
+    subscriber.events = ['end']
     subscription.register()
-
-    const [subscriber] = Object.values(subscription._subscribers)
 
     helper.runInTransaction(agent, (tx) => {
       const segment = tx.trace.root
@@ -239,9 +276,68 @@ test('Subscription#register', async (t) => {
 
       subscriber.end({})
 
-      assert.ok(handlerCalled)
       assert.ok(touchSpy.called)
       agent.tracer.getContext.restore()
     })
+  })
+
+  await t.test('overriding end() without touching does not touch the segment', (t) => {
+    const { agent } = t.nr
+    const Subscription = loadSubscription({ patchStub: sinon.stub() })
+
+    const subscription = new Subscription(agent, 'my-lib')
+    const subscriber = subscription.instrument({ module: VALID_MODULE, functionQuery: VALID_FUNCTION_QUERY })
+    subscriber.events = ['end']
+    subscriber.end = () => {}
+    subscription.register()
+
+    helper.runInTransaction(agent, (tx) => {
+      const segment = tx.trace.root
+      const touchSpy = sinon.spy(segment, 'touch')
+      sinon.stub(agent.tracer, 'getContext').returns({ segment })
+
+      subscriber.end({})
+
+      assert.ok(touchSpy.notCalled)
+      agent.tracer.getContext.restore()
+    })
+  })
+
+  await t.test('throws when a handler is assigned but its event was never added to .events', (t) => {
+    const { agent } = t.nr
+    const Subscription = loadSubscription({ patchStub: sinon.stub() })
+
+    const subscription = new Subscription(agent, 'my-lib')
+    const subscriber = subscription.instrument({ module: VALID_MODULE, functionQuery: VALID_FUNCTION_QUERY })
+    subscriber.end = () => {}
+
+    assert.throws(
+      () => subscription.register(),
+      /'end' is defined but not listed in subscriber\.events/
+    )
+  })
+
+  await t.test('throws a clear error, not a native TypeError, when .events is not an array', (t) => {
+    const { agent } = t.nr
+    const Subscription = loadSubscription({ patchStub: sinon.stub() })
+
+    const subscription = new Subscription(agent, 'my-lib')
+    const subscriber = subscription.instrument({ module: VALID_MODULE, functionQuery: VALID_FUNCTION_QUERY })
+    subscriber.events = undefined
+
+    assert.throws(
+      () => subscription.register(),
+      /subscriber\.events must be an array, got undefined/
+    )
+  })
+
+  await t.test('does not throw when handlers were assigned via the .instrument() shortcut', (t) => {
+    const { agent } = t.nr
+    const Subscription = loadSubscription({ patchStub: sinon.stub() })
+
+    const subscription = new Subscription(agent, 'my-lib')
+    subscription.instrument({ module: VALID_MODULE, functionQuery: VALID_FUNCTION_QUERY }, { end: () => {} })
+
+    assert.doesNotThrow(() => subscription.register())
   })
 })
