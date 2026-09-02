@@ -364,6 +364,11 @@ test('with default properties', async (t) => {
     assert.equal(apollo.health_check_queries, false)
     assert.equal(apollo.field_metrics, false)
   })
+
+  await t.test('kafka defaults', () => {
+    const kafka = configuration.kafka
+    assert.equal(kafka.metrics.cluster.metrics.enabled, false)
+  })
 })
 
 test('with undefined as default', async (t) => {

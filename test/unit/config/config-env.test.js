@@ -489,6 +489,18 @@ test('when overriding configuration values via environment variables', async (t)
     })
   })
 
+  await t.test('should set the kafka options', (t, end) => {
+    const env = {
+      NEW_RELIC_KAFKA_METRICS_CLUSTER_METRICS_ENABLED: 'true'
+    }
+
+    idempotentEnv(env, (tc) => {
+      const kafka = tc.kafka
+      assert.equal(kafka.metrics.cluster.metrics.enabled, true)
+      end()
+    })
+  })
+
   await t.test('should pick up the log filepath', (t, end) => {
     idempotentEnv({ NEW_RELIC_LOG: '/highway/to/the/danger/zone' }, (tc) => {
       assert.equal(tc.logging.filepath, '/highway/to/the/danger/zone')
